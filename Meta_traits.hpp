@@ -221,6 +221,7 @@ namespace meta_base
         public:
         using type=Template<>;
         static constexpr bool S_correct=true;
+        static constexpr bool S_normal=true;
         static constexpr size_t S_size=sizeof...(Types);
     };
 
@@ -231,6 +232,7 @@ namespace meta_base
         using value_type=Value;
         using type=Template<Value>;
         static constexpr bool S_correct =true;
+        static constexpr bool S_normal= false;
         static constexpr size_t S_size=sizeof...(value);
     };
 
@@ -240,6 +242,7 @@ namespace meta_base
     public:
         using value_type=Value;
         using type=Template<Value>;
+        static constexpr bool S_normal= false;
         static constexpr bool S_correct =true;
         static constexpr size_t S_size=0;
     };
@@ -250,11 +253,17 @@ namespace meta_base
     template<class List>
     inline constexpr bool is_empty_v=!Meta_traits<List>::S_size;
 
+    template<class List>
+    inline constexpr bool is_correct_v=Meta_traits<List>::S_correct;
+
+    template<class List>
+    inline constexpr bool is_normal_v=Meta_traits<List>::S_normal;
+
     template<class Template>
     using traits_value_t=typename Meta_traits<Template>::value_type;
 
     template<class Template>
     inline constexpr auto extent_v=Meta_traits<Template>::S_size;
-    
+
 }
 #endif
