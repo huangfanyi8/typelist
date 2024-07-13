@@ -207,4 +207,54 @@ namespace meta_base
     template<template<class...>class Template, class...Types>
     inline constexpr bool is_specialization_v = is_specialization<Template, Types...>::value;
 }
+
+//traits
+namespace meta_base
+{
+    template<class...>
+    class Meta_traits
+    {};
+
+    template<template<class ...>class Template,class...Types>
+    class Meta_traits<Template<Types...>>
+    {
+        public:
+        using type=Template<>;
+        static constexpr bool S_correct=true;
+        static constexpr size_t S_size=sizeof...(Types);
+    };
+
+    template<template<class Value,Value...>class Template,class Value,Value...value>
+    class Meta_traits<Template<Value,value...>>
+    {
+    public:
+        using value_type=Value;
+        using type=Template<Value>;
+        static constexpr bool S_correct =true;
+        static constexpr size_t S_size=sizeof...(value);
+    };
+
+    template<template<class Value,Value...>class Template,class Value>
+    class Meta_traits<Template<Value>>
+    {
+    public:
+        using value_type=Value;
+        using type=Template<Value>;
+        static constexpr bool S_correct =true;
+        static constexpr size_t S_size=0;
+    };
+
+    template<class List>
+    using empty_t=typename Meta_traits<List>::type;
+
+    template<class List>
+    inline constexpr bool is_empty_v=!Meta_traits<List>::S_size;
+
+    template<class Template>
+    using traits_value_t=typename Meta_traits<Template>::value_type;
+
+    template<class Template>
+    inline constexpr auto extent_v=Meta_traits<Template>::S_size;
+    
+}
 #endif
