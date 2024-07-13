@@ -1,0 +1,4 @@
+D:\clion\Clion\bin\cmake\win\x64\bin\cmake.exe -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=D:/clion/Clion/bin/ninja/win/x64/ninja.exe -G Ninja -S D:\c++\tools\meta\typelist -B D:\c++\tools\meta\typelist\cmake-build-debug
+-- Configuring done (0.2s)
+-- Generating done (0.0s)
+-- Build files have been written to: D:/c++/tools/meta/typelist/cmake-build-debug
