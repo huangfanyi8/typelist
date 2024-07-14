@@ -7,6 +7,54 @@
 using std::size_t ;
 using std::ptrdiff_t;
 
+//constant sequence
+namespace meta_base
+{
+    template<class Value, Value...value>
+    struct constant_sequence
+    {
+        using value_type = Value;
+        static constexpr size_t size = sizeof...(value);
+
+        template<template<class Other,Other...>class Template,class Other,Other...other>
+        using rebind=Template<Other,other...>;
+    };
+
+    template<class Value, Value v>
+    struct constant
+    {
+        using value_type = Value;
+        static constexpr value_type value = v;
+        constexpr value_type operator()() const { return value; }
+        constexpr  operator value_type() const { return value; }
+    };
+
+    template<bool v>
+    using bool_constant=constant<bool,v>;
+
+    template<size_t...v>
+    using normal_sequence=constant_sequence<size_t,v...>;
+
+    template<ptrdiff_t...v>
+    using range_sequence=constant_sequence<ptrdiff_t ,v...>;
+
+    template<bool...v>
+    using bool_sequence=constant_sequence<bool,v...>;
+
+    template<char...v>
+    using char_sequence=constant_sequence<char,v...>;
+
+    template<int...v>
+    using int_sequence=constant_sequence<int,v...>;
+}
+
+//Test template
+namespace meta_base
+{
+    template<class...>class tuple{};
+    template<class...>class variant{};
+}
+
 //switch , binary_t
 namespace  meta_base
 {
