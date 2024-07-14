@@ -10,6 +10,8 @@ using std::ptrdiff_t;
 //constant sequence
 namespace meta_base
 {
+    class undefined{};
+
     template<class Value, Value...value>
     struct constant_sequence
     {
