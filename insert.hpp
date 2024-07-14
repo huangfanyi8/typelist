@@ -80,7 +80,7 @@ namespace meta_base
     template<class>
     struct insert_if
     {
-        
+
     };
 }
 
