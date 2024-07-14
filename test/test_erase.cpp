@@ -7,8 +7,6 @@ int main()
 {
     using namespace meta_base;
 
-
-
     using LongList=TypeList<int,void*,double,char*,float,int&,long&>;
     using LongSequence=meta_base::char_sequence<'1','2','3','4','5','6','7','8'>;
 
@@ -37,4 +35,6 @@ int main()
     static_assert(is_same_v<pop_front_t<char_sequence<>>,char_sequence<>>) ;
     static_assert(is_same_v<pop_front_t<char_sequence<'l'>>,char_sequence<>>) ;
     static_assert(is_same_v<pop_back_t<int_sequence<-1,-2,-3,4,5,6,7>>,int_sequence<-1,-2,-3,4,5,6>>) ;
+    //static_assert(is_same_v<erase_t<int_sequence<5> ,-5>,
+   //         int_sequence<>>);
 }
