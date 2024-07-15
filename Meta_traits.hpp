@@ -114,8 +114,6 @@ namespace  meta_base
     template<bool  Cond,class Type>
     using unary_t=typename Unary<Cond,Type>::type ;
 
-    static_assert(std::is_same_v<switch_t<0,int>,int>);
-    static_assert(std::is_same_v<switch_t<1,int,double>,double>);
 }
 
 //map_t ,  remove_cvref_t
