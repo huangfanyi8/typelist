@@ -50,13 +50,6 @@ namespace meta_base
     using int_sequence=constant_sequence<int,v...>;
 }
 
-//Test template
-namespace meta_base
-{
-    template<class...>class tuple{};
-    template<class...>class variant{};
-}
-
 //switch , binary_t
 namespace  meta_base
 {
