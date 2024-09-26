@@ -4,7 +4,7 @@
 
 #include<type_traits>
 
-using std::size_t ;
+using std::size_t;
 using std::ptrdiff_t;
 
 //constant sequence
@@ -113,7 +113,6 @@ namespace  meta_base
 
     template<bool  Cond,class Type>
     using unary_t=typename Unary<Cond,Type>::type ;
-
 }
 
 //map_t ,  remove_cvref_t
@@ -204,9 +203,12 @@ namespace meta_base
 
     template<class H,class...Rest>
     inline constexpr bool is_same_v=is_same<H,Rest...>::value;
+
+    template<class Value,Value first,Value...rest>
+    using is_same_c=bool_constant<((first==rest)&&...)>;
 }
 
-//logic
+//Logic predicate
 namespace meta_base
 {
     //conjunction_v
