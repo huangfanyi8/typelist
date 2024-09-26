@@ -20,10 +20,7 @@ namespace meta_base
 
     template<class L,class R>
     using less_or_equal=bool_constant<sizeof (L)<=sizeof(R)>;
-
-    #define IS_SAME(TYPE,POSTFIX)\
-    template<class Type>\
-    using is_same_##POSTFIX=is_same<TYPE,Type>;
+    
 
 }
 
