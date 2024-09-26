@@ -1,4 +1,10 @@
 #include"../insert.hpp"
+#include"../predicate.hpp"
+#include<variant>
+#include<tuple>
+
+using std::variant;
+using std::tuple;
 
 //insert_constant
 namespace meta_base::test
@@ -37,6 +43,27 @@ namespace meta_base::test
             insert_constant_t<range_sequence<>,0,0>>);
 }
 
+template<class T>
+using is_same_int=std::is_same<T,int>;
+
+void Test_insert_if()
+{
+    static_assert(meta_base::is_same_v<variant<char,int>,
+
+                  meta_base::insert_if_t<variant<int>,is_same_int,char>>);
+
+    static_assert(meta_base::is_same_v<variant<>,
+
+                  meta_base::insert_if_t<variant<>,is_same_int,char>>);
+  
+  static_assert(meta_base::is_same_v<variant<char,int,char,int>,
+    
+    meta_base::insert_if_t<variant<int,int>,is_same_int,char>>);
+}
+
+template<int constant>
+using is_even=meta_base::bool_constant<constant%2==0>;
+
 int main()
 {
     using namespace meta_base;
@@ -70,4 +97,13 @@ int main()
 
     static_assert(is_same_v<variant<int,double>,
                   insert_t<variant<int>,9,double>>);
+  
+    static_assert(is_same_v<insert_constant_if_t<int_sequence<1,2,3,4,5,6>,is_even,0>,
+      int_sequence<1,0,2,3,0,4,5,0,6>>);
+  
+  static_assert(is_same_v<insert_constant_if_t<int_sequence<>,is_even,0>,
+    int_sequence<>>);
+  
+  static_assert(is_same_v<insert_constant_if_t<int_sequence<1>,is_even,0>,
+    int_sequence<1>>);
 }
