@@ -52,7 +52,7 @@ namespace meta_base
       struct Impl<Idx,List<V,Head,Rest...>,Empty>
               :binary_t<Idx!=Position,
                       Impl<Idx+1,List<V,Rest...>,merge_t<Empty,List<V,Head>>>,
-                      merge<Empty,List<V,Add...>,List<V,Head,Rest...>>
+                      merge<Empty,List<V,Head,Add...>,List<V,Rest...>>
               >
       {};
 
