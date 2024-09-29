@@ -14,7 +14,7 @@ namespace meta_base
           :type_identity<Template<Increment...,Types...>>
   {};
 
-  template<size_t  Idx,template<class...>class Template,class...Increment>
+  template<size_t Idx,template<class...>class Template,class...Increment>
   struct Insert_base<Template<>,Idx,std::enable_if_t<Idx!=0>,Increment...>
           :type_identity<Template<Increment...>>
   {};
@@ -32,41 +32,49 @@ namespace meta_base
   using prepend_t=insert_t<Template,0,Increment...>;
 
   template<class Template,class...Increment>
-  using append_t=insert_t<Template,size_t(-1),Increment...>;
-
+  using append_t=insert_t<Template,extent_v<Template>,Increment...>;
 }
 
 namespace meta_base
 {
-  template<class Template,size_t Position,traits_value_t<Template>...Add>
+  template<class Template,ptrdiff_t Position,traits_value_t<Template>...Add>
   struct insert_constant
   {
+    static constexpr auto S_position=index_conversion<Position,Template>;
+    static constexpr auto S_out_of_range=Is_out_of_range_v<Template,Position>;
   public:
       using value_type=traits_value_t<Template>;
   private:
-      template<ptrdiff_t Idx,class List,class Empty>
+      template<ptrdiff_t Idx,class List,class Empty,bool>
       struct Impl
       {};
 
       template<ptrdiff_t Idx,template<class V,V...>class List,class V,class Empty,V Head,V...Rest>
-      struct Impl<Idx,List<V,Head,Rest...>,Empty>
-              :binary_t<Idx!=Position,
-                      Impl<Idx+1,List<V,Rest...>,merge_t<Empty,List<V,Head>>>,
-                      merge<Empty,List<V,Head,Add...>,List<V,Rest...>>
+      struct Impl<Idx,List<V,Head,Rest...>,Empty,false>
+              :binary_t<Idx!=S_position,
+                      Impl<Idx+1,List<V,Rest...>,merge_t<Empty,List<V,Head>>,false>,
+                      merge<Empty,List<V,Add...>,List<V,Head,Rest...>>
               >
       {};
-
+    
+      template<ptrdiff_t Idx,template<class V,V...>class List,class V,class Empty,V...Value>
+      struct Impl<Idx,List<V,Value...>,Empty,true>
+        :binary_t<(Position>0),
+            type_identity<List<V,Value...,Add...>>,
+          type_identity<List<V,Add...,Value...>>>
+      {};
+    
       template<ptrdiff_t Idx,template<class V,V...>class List,class V,class Empty>
-      struct Impl<Idx,List<V>,Empty>
+      struct Impl<Idx,List<V>,Empty,false>
               :merge<Empty,List<V,Add...>>
       {};
 
   public:
       using type=
-              typename Impl<0,Template,empty_t<Template>>::type;
+              typename Impl<0,Template,empty_t<Template>,S_out_of_range>::type;
   };
 
-  template<class Template,size_t Position,traits_value_t<Template>...Add>
+  template<class Template,ptrdiff_t Position,traits_value_t<Template>...Add>
   using insert_constant_t=typename insert_constant<Template,Position,Add...>::type;
 
   template<class Template,traits_value_t<Template> ...Add>
@@ -121,5 +129,6 @@ namespace meta_base
   template<class Template,template<auto...>class Predicate,traits_value_t<Template>...Increments>
   using insert_constant_if_t=typename insert_constant_if<Template,Predicate,Increments...>::type;
 }
+
 
 #endif //META_INSERT_HPP
