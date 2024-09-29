@@ -24,9 +24,6 @@ namespace meta_base::test
     static_assert(is_same_v<int_sequence<1,3,6,4,5,6>,
             insert_constant_t<int_sequence<1,3,4,5,6>,2,6>>);
 
-    static_assert(is_same_v<int_sequence<1,2,6,3,4,5,6>,
-            insert_constant_t<int_sequence<1,2,3,4,5,6>,2,6>>);
-
     static_assert(is_same_v<int_sequence<1,2,3,6,4,5,6>,
             insert_constant_t<int_sequence<1,2,3,4,5,6>,3,6>>);
 
@@ -40,7 +37,24 @@ namespace meta_base::test
             insert_constant_t<int_sequence<1,2,3,4,5,6>,99,6>>);
 
     static_assert(is_same_v<range_sequence<0>,
-            insert_constant_t<range_sequence<>,0,0>>);
+            insert_constant_t<range_sequence<>,0,0>,
+      insert_constant_t<range_sequence<>,10,0>,
+      insert_constant_t<range_sequence<>,-10,0>
+            >);
+  
+  static_assert(is_same_v<int_sequence<1,3,4,6,5,6>,
+    insert_constant_t<int_sequence<1,3,4,5,6>,-2,6>>);
+  
+  static_assert(is_same_v<int_sequence<1,3,2,4,5,6>,
+    insert_constant_t<int_sequence<1,3,4,5,6>,-3,2>>);
+  
+  static_assert(is_same_v<int_sequence<1,6,3,4,5,6>,
+    insert_constant_t<int_sequence<1,3,4,5,6>,-4,6>>);
+  
+  static_assert(is_same_v<int_sequence<6,1,3,4,5,6>,
+    insert_constant_t<int_sequence<1,3,4,5,6>,-5,6>,
+    insert_constant_t<int_sequence<1,3,4,5,6>,-6,6>,
+    insert_constant_t<int_sequence<1,3,4,5,6>,-55,6>>);
 }
 
 template<class T>
@@ -93,6 +107,11 @@ int main()
     static_assert(is_same_v<insert_t<variant<>,5555,void,int>,
             variant<void,int>
                   >);
+  
+  static_assert(is_same_v<insert_t<variant<double*>,5555,void,int>,
+    variant<double*,void,int>
+  >);
+  
     static_assert(is_same_v<prepend_t<variant<int>,double>,variant<double,int>>);
 
     static_assert(is_same_v<variant<int,double>,
