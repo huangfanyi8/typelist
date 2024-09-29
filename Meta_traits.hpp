@@ -309,4 +309,41 @@ namespace meta_base
     inline constexpr auto extent_v=Meta_traits<Template>::S_size;
 
 }
+
+namespace meta_base
+{
+  //长度为0 不考虑
+  //长度为1
+  //-1 extent_v<T>-1
+  //-2 extent_v<T>-2
+  template<ptrdiff_t index,class TypeList>
+  inline constexpr ptrdiff_t index_conversion
+    =index<0?static_cast<ptrdiff_t>(extent_v<TypeList>)+index:index;
+  
+  template<class List,ptrdiff_t Idx,bool=(Idx>0)>
+  struct Out_of_range
+  {
+  private:
+    static constexpr ptrdiff_t S_extent=ptrdiff_t(extent_v<List>);
+  
+  public:
+    static constexpr bool value=Idx>=S_extent;
+  };
+  
+  template<class List,ptrdiff_t Idx>
+  struct Out_of_range<List,Idx,false>
+  {
+  private:
+    static constexpr ptrdiff_t S_extent=ptrdiff_t (extent_v<List>);
+  
+  public:
+    static constexpr bool value=Idx<-S_extent;
+  };
+  
+  template<class Template,ptrdiff_t Idx>
+  inline constexpr bool Is_out_of_range_v=Out_of_range<Template,Idx>::value;
+}
+
+namespace meta_base::experimental{}
+
 #endif
