@@ -21,7 +21,13 @@ namespace meta_base
     template<class L,class R>
     using less_or_equal=bool_constant<sizeof (L)<=sizeof(R)>;
     
-
+    template<bool A,bool B>
+    struct equal_pred
+      :bool_constant<A&&B>
+    {};
+    
+  template<auto v1,auto v2>
+  using equal_Arg=bool_constant<v1==v2>;
 }
 
 #endif //META_PREDICATE_HPP

@@ -1,3 +1,8 @@
+/*
+ *insert  algorithm
+ *
+ */
+
 #ifndef META_INSERT_HPP
 #define META_INSERT_HPP
 
@@ -5,7 +10,7 @@
 
 namespace meta_base
 {
-  template<class Template,size_t Position,class,class...Increment>
+  template<class Template,ptrdiff_t Position,class,class...Increment>
   struct Insert_base
   {};
 
@@ -14,18 +19,27 @@ namespace meta_base
           :type_identity<Template<Increment...,Types...>>
   {};
 
-  template<size_t Idx,template<class...>class Template,class...Increment>
-  struct Insert_base<Template<>,Idx,std::enable_if_t<Idx!=0>,Increment...>
+  template<ptrdiff_t Idx,template<class...>class Template,class...Increment>
+  struct Insert_base<Template<>,Idx,std::enable_if_t<(Idx>0)>,Increment...>
           :type_identity<Template<Increment...>>
   {};
-
-  //insert_t<variant<int,double,char>,3,void>
-  template<size_t Idx,template<class...>class Template,class Head,class...Increment,class...Rest>
+  
+  template<ptrdiff_t Idx,
+          template<class...>class Template,
+          class Head,class...Rest,
+          class...Increment>
   struct Insert_base<Template<Head,Rest...>,Idx,std::enable_if_t<(Idx>=1)>,Increment...>
           :merge<Template<Head>,typename Insert_base<Template<Rest...>,Idx-1,void,Increment...>::type>
   {};
-
-  template<class Template,size_t Position,class...Increment>
+  
+  template<template<class...>class Template,class...Types,ptrdiff_t Idx,class...Increments>
+  struct Insert_base<Template<Types...>,Idx,std::enable_if_t<(Idx<0)>,Increments...>
+    :binary_t<(Idx>=-ptrdiff_t(extent_v<Template<Types...>>)),
+    Insert_base<Template<Types...>,index_conversion<Idx,Template<Types...>>,void,Increments...>,
+    type_identity<Template<Increments...,Types...>>>
+  {};
+  
+  template<class Template,ptrdiff_t Position,class...Increment>
   using insert_t=typename Insert_base<Template,Position,void,Increment...>::type;
 
   template<class Template,class...Increment>

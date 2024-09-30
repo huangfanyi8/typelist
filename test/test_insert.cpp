@@ -55,6 +55,9 @@ namespace meta_base::test
     insert_constant_t<int_sequence<1,3,4,5,6>,-5,6>,
     insert_constant_t<int_sequence<1,3,4,5,6>,-6,6>,
     insert_constant_t<int_sequence<1,3,4,5,6>,-55,6>>);
+  
+  static_assert(is_same_v<int_sequence<6,1,3>,
+    insert_constant_t<int_sequence<1,3>,-2,6>>);
 }
 
 template<class T>
@@ -70,9 +73,14 @@ void Test_insert_if()
 
                   meta_base::insert_if_t<variant<>,is_same_int,char>>);
   
-  static_assert(meta_base::is_same_v<variant<char,int,char,int>,
+    static_assert(meta_base::is_same_v<variant<char,int,char,int>,
     
     meta_base::insert_if_t<variant<int,int>,is_same_int,char>>);
+  
+  static_assert(meta_base::is_same_v<meta_base::insert_t<variant<>,-1,char*>,variant<char*>>);
+  
+  static_assert(meta_base::is_same_v<meta_base::insert_t<variant<int,char>,-11,char*>,variant<char*,int,char>>);
+  static_assert(meta_base::is_same_v<meta_base::insert_t<variant<int,char>,-1,char*>,variant<int,char*,char>>);
 }
 
 template<int constant>

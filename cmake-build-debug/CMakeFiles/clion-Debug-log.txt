@@ -1,4 +1,12 @@
-D:\clion\Clion\bin\cmake\win\x64\bin\cmake.exe -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=D:/clion/Clion/bin/ninja/win/x64/ninja.exe -G Ninja -S D:\c++\tools\meta\typelist -B D:\c++\tools\meta\typelist\cmake-build-debug
+D:\clion\CLion\bin\cmake\win\x64\bin\cmake.exe -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=D:/clion/CLion/bin/ninja/win/x64/ninja.exe -G Ninja -S D:\c++\tools\meta\typelist -B D:\c++\tools\meta\typelist\cmake-build-debug
+D:/c++/tools/meta/typelist/test/test_erase.cpp;D:/c++/tools/meta/typelist/test/test_find.cpp;D:/c++/tools/meta/typelist/test/test_get_n.cpp;D:/c++/tools/meta/typelist/test/test_insert.cpp;D:/c++/tools/meta/typelist/test/test_reverse.cpp;D:/c++/tools/meta/typelist/test/test_swap.cpp;D:/c++/tools/meta/typelist/test/test_unique.cpp
+test_erase
+test_find
+test_get_n
+test_insert
+test_reverse
+test_swap
+test_unique
 -- Configuring done (0.2s)
 -- Generating done (0.0s)
 -- Build files have been written to: D:/c++/tools/meta/typelist/cmake-build-debug

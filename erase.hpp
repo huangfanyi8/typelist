@@ -1,50 +1,19 @@
-#ifndef   ERASE_HPP
-#define  ERASE_HPP
+#ifndef  META_ERASE_HPP
+#define  META_ERASE_HPP
 
 #include"reverse.hpp"
 
-///erase
 namespace meta_base
 {
-    template<class List,ptrdiff_t Idx,bool=(Idx>0)>
-    struct Out_of_range
-    {
-    private:
-        static constexpr ptrdiff_t S_extent=ptrdiff_t (extent_v<List>);
-
-    public:
-        static constexpr bool value=Idx>=S_extent;
-    };
-
-    template<class List,ptrdiff_t Idx>
-    struct Out_of_range<List,Idx,false>
-    {
-    private:
-        static constexpr ptrdiff_t S_extent=ptrdiff_t (extent_v<List>);
-
-    public:
-        static constexpr bool value=Idx<-S_extent;
-    };
-
-    template<class Template,ptrdiff_t Idx>
-    inline constexpr bool Is_out_of_range_v=Out_of_range<Template,Idx>::value;
-}
-
-namespace meta_base
-{
-    template<ptrdiff_t Idx,class List>
-    inline constexpr ptrdiff_t pn_conversion_v=Idx>=0?Idx:ptrdiff_t (extent_v<List>)+Idx;
-
     template<class Template,ptrdiff_t Position>
     class Erase_helper
     {};
 
-    template<template<class ...>class Template,ptrdiff_t Idx>
+    template<template<class...>class Template,ptrdiff_t Idx>
     class Erase_helper<Template<>,Idx>
     {
     public:
         using type=Template<>;
-        using front=undefined;
     };
 
     template<template<class Value,Value...>class Template,class Value,ptrdiff_t Idx>
@@ -52,7 +21,6 @@ namespace meta_base
     {
     public:
         using type=Template<Value>;
-        static constexpr Value front=Value{};
     };
 
     template<template<class Value,Value...>class Template,
@@ -62,7 +30,7 @@ namespace meta_base
     {
         static_assert(!Is_out_of_range_v<Template<Value,Head,Rest...>,Position>,"Out of range!");
 
-        static constexpr auto S_pos=pn_conversion_v<Position,Template<Value,Head,Rest...>>;
+        static constexpr auto S_pos=index_conversion<Position,Template<Value,Head,Rest...>>;
     public:
         using value_type=Value;
     private:
@@ -87,9 +55,9 @@ namespace meta_base
     {
         static_assert(!Is_out_of_range_v<Template<Head,Rest...>,Position>,"Out of range!");
 
-        static constexpr auto S_pos=pn_conversion_v<Position,Template<Head,Rest...>>;
+        static constexpr auto S_pos=index_conversion<Position,Template<Head,Rest...>>;
     private:
-        template<ptrdiff_t _Index,class List,class Out>
+        template<ptrdiff_t Index,class List,class Out>
         struct Impl
                 :type_identity<undefined>
         {};
