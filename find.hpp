@@ -114,12 +114,11 @@ namespace meta_base
 namespace meta_base
 {
     template<class Template,
-            template<traits_value_t<Template>,traits_value_t<Template>...>class Predicate,
-            traits_value_t<Template>...Parameters>
+            template<auto,auto...>class Predicate,
+            auto...Parameters>
     class Find_base_c
     {
     private:
-        using index_sequence=normal_sequence<>;
         using Empty_list=empty_t<Template>;
         static constexpr auto S_extent_v=extent_v<Template>;
 
@@ -151,7 +150,7 @@ namespace meta_base
         static constexpr auto count=Impl<0,void,Template,empty_t<Template>,normal_sequence<>>::S_size;
     };
 
-    template<class Template,traits_value_t<Template> arg>
+    template<class Template,auto arg>
     class equal_range_c
     {
     private:
