@@ -1,14 +1,14 @@
 #ifndef META_GET_N_HPP
 #define META_GET_N_HPP
 
-#include"erase.hpp"
+#include"reverse.hpp"
 
 namespace meta_base
 {
     template<class Template,ptrdiff_t Idx,bool=is_normal_v<Template>>
     class get_n_element
     {
-        static constexpr auto S_idx=pn_conversion_v<Idx,Template>;
+        static constexpr auto S_idx=index_conversion<Idx,Template>;
         template<ptrdiff_t c,class,class List>
         struct Impl
                 :type_identity<undefined>
@@ -59,7 +59,7 @@ namespace meta_base
     class get_n_element<Template,Position,false>
     {
     private:
-        static constexpr auto S_idx=pn_conversion_v<Position,Template>;
+        static constexpr auto S_idx=index_conversion<Position,Template>;
 
         using value_type=traits_value_t<Template>;
     private:
