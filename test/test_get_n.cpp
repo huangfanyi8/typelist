@@ -50,4 +50,6 @@ int main()
     static_assert(get_n_v<range_sequence<-3,-2,-1,0,1,2,3,4>,2> == -1);
     static_assert(get_n_v<range_sequence<-3,-2,-1,0>,-4> ==-3);
     static_assert(get_n_v<range_sequence<-3,-2,-1,0>,-1> ==0);
+  
+    static_assert(back_v<int_sequence<>> ==0);
 }
