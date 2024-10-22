@@ -1,3 +1,13 @@
+/*
+ * copy_ref<A,B> 拷贝A的引用属性给B
+ * copy_cv<A,B> 拷贝A的cv属性给B
+ * get_n switch_t 获取列表中第n个type，下标从0开始
+ * similar<A,B>：如果A,B是模板，只有在相等ref与cv属性下返回true type，否则返回false type
+ *
+ * */
+
+
+
 #ifndef COMMON_HPP
 #define COMMON_HPP
 
@@ -293,7 +303,7 @@ namespace common
   template<class Template,std::ptrdiff_t Idx>
   using get_n_t=typename get_n<Template,Idx>::type;
   
-  template<size_t Idx,class...Types>
+  template<std::ptrdiff_t Idx,class...Types>
   using switch_t=typename Switch<Idx,void,Types...>::type;
 
   //std::conditional_t
