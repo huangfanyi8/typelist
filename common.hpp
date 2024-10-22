@@ -1,5 +1,5 @@
-#ifndef META_TRAITS_HPP
-#define META_TRAITS_HPP
+#ifndef COMMON_HPP
+#define COMMON_HPP
 
 #if __has_include(<cstddef>)
 #include<cstddef>
