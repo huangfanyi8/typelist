@@ -30,8 +30,10 @@ __cplusplus >= VERSION || (defined(_MSVC_LANG) && _MSVC_LANG >= VERSION)
 
 #if NON_STL_20
 #define CONCEPT concept
+#define CONSTEVAL consteval
 #else
 #define CONCEPT INLINE constexpr bool
+#define CONSTEVAL constexpr
 #endif
 
 //constant sequence
@@ -141,6 +143,9 @@ namespace common
   template<template<class...> class T, class...Types>
   PRIVATE_INLINE constexpr bool _is_template_v<T<Types...>> = true;
   
+  template<template<class Value,Value...>class T, class Value, Value...v>
+  PRIVATE_INLINE constexpr bool _is_template_v<T<Value,v...>> = true;
+  
   template<class>
   struct _meta_traits
   {};
@@ -171,29 +176,29 @@ namespace common
   
   template<class T>
   struct meta_traits
-    : _meta_traits<remove_cvref_t<T>> {
-};
+    : _meta_traits<remove_cvref_t<T>>
+  {};
 
-template<class List>
-using make_empty_t = typename meta_traits<List>::type;
-
-template<class List>
-INLINE constexpr bool is_empty_v = !meta_traits<List>::value;
-
-template<class List>
-INLINE constexpr bool is_correct_v = meta_traits<List>::S_correct;
-
-template<class List>
-INLINE constexpr bool is_normal_v = meta_traits<List>::S_normal;
-
-template<class Template>
-using traits_value_t = typename meta_traits<Template>::value_type;
-
-template<class Template>
-INLINE constexpr auto extent_v = meta_traits<Template>::value;
-
-template<class T>
-PRIVATE_INLINE constexpr bool is_template_v = _is_template_v<remove_cvref_t<T>>;
+  template<class List>
+  using make_empty_t = typename meta_traits<List>::type;
+  
+  template<class List>
+  INLINE constexpr bool is_empty_v = !meta_traits<List>::value;
+  
+  template<class List>
+  INLINE constexpr bool is_correct_v = meta_traits<List>::S_correct;
+  
+  template<class List>
+  INLINE constexpr bool is_normal_v = meta_traits<List>::S_normal;
+  
+  template<class Template>
+  using traits_value_t = typename meta_traits<Template>::value_type;
+  
+  template<class Template>
+  INLINE constexpr auto extent_v = meta_traits<Template>::value;
+  
+  template<class T>
+  INLINE constexpr bool is_template_v = _is_template_v<remove_cvref_t<T>>;
 }
 
 //switch , binary_t
@@ -423,21 +428,90 @@ namespace common
   #endif
 }
 
-//Template similar
+//similar reference cv attribute
 namespace common
 {
-  template<class,class>
-  inline constexpr bool is_similar_v=false;
-
-  template<template<class Value,Value...>class A,
-          template<class Value,Value...>class B,
-          class T1,class T2,T1...v1,T2...v2>
-  inline constexpr bool is_similar_v<A<T1,v1...>,B<T2,v2...>> =true;
-
-  template<template<class...>class A,
-          template<class...>class B,
-          class...Types,class...Types1>
-  inline constexpr bool is_similar_v<A<Types...>,B<Types1...>> =true;
+  enum ReferenceType
+  {
+    S_lvalue_reference,
+    S_rvalue_reference,
+    S_none
+  };
+  
+  template<class T>
+  INLINE constexpr
+  ReferenceType _reference_cast
+    =std::is_lvalue_reference<T>::value
+     ?S_lvalue_reference
+     :std::is_rvalue_reference<T>::value
+      ?S_rvalue_reference
+      :S_none;
+  
+  template<class Left,class Right,
+    auto l=_reference_cast<Left>,
+    auto r=_reference_cast<Right>>
+  struct _is_similar
+  {
+  private:
+    using L=std::remove_reference_t<Left>;
+    using R=std::remove_reference_t<Right>;
+    
+    static constexpr bool l_c=
+      std::is_const<L>::value;
+    
+    static constexpr bool r_c=
+      std::is_const<R>::value;
+    
+    static constexpr bool l_v=
+      std::is_volatile<L>::value;
+    
+    static constexpr bool r_v=
+      std::is_volatile<R>::value;
+    
+  public:
+    static constexpr bool value=
+      (l==r)
+      &&(l_c==r_c)
+      &&(l_v==r_v);
+  };
+  
+  template<class Left,class Right>
+  struct is_similar_helper
+    :std::false_type
+  {};
+  
+  template<template<class ...>class Left,
+    template<class ...>class Right,
+    class...A,class...B>
+  struct is_similar_helper<Left<A...>,Right<B...>>
+    :std::true_type
+  {};
+  
+  template<template<class A,A...>class Left,
+    template<class B,B...>class Right,
+    class A,class B,
+    A...a,B...b>
+  struct is_similar_helper<Left<A,a...>,Right<B,b...>>
+    :std::true_type
+  {};
+  
+  template<template<class A,A...>class Left,
+    template<class B,B...>class Right,
+    class A,class B>
+  struct is_similar_helper<Left<A>,Right<B>>
+    :std::true_type
+  {};
+  
+  template<class Left,class Right>
+  struct is_similar
+    :bool_constant<
+    is_similar_helper<remove_cvref_t<Left>,remove_cvref_t<Right>>::value
+    && _is_similar<Left,Right>::value
+    >
+  {};
+  
+  template<class L,class R>
+  INLINE constexpr bool is_similar_v=is_similar<L,R>::value;
 }
 
 //is_specialization
@@ -457,7 +531,7 @@ namespace common
   inline constexpr bool is_specialization_v = is_specialization<Template, Types...>::value;
 }
 
-//common_type
+//cxx20 common_type
 namespace common
 {
   //common_type cxx20 form
@@ -509,7 +583,7 @@ namespace common
   using common_type_t=typename common_type<Types...>::type;
 }
 
-//common_reference_t
+//cxx23 common_reference_t
 namespace common
 {
   template<class T,class U,
@@ -526,23 +600,7 @@ namespace common::common_reference_detail
   template<class T>
   INLINE constexpr bool S_exists_v=!std::is_same<remove_cvref<T>,undefined>::value;
   
-  enum ReferenceType
-  {
-    S_lvalue_reference,
-    S_rvalue_reference,
-    S_none
-  };
-  
-  template<class T>
-  INLINE constexpr
-  ReferenceType S_reference_v
-    =std::is_lvalue_reference<T>::value
-      ?S_lvalue_reference
-      :std::is_rvalue_reference<T>::value
-      ?S_rvalue_reference
-      :S_none;
-  
-  template<class T,ReferenceType v=S_reference_v<T>>
+  template<class T,ReferenceType v=_reference_cast<T>>
   struct xref
   {
     template<class U>
@@ -581,8 +639,8 @@ namespace common::common_reference_detail
   {
   private:
     template<class L,class R,
-      ReferenceType=S_reference_v<L>,
-    ReferenceType=S_reference_v<R>>
+      ReferenceType=_reference_cast<L>,
+    ReferenceType=_reference_cast<R>>
     struct Impl
       :type_identity<undefined>
     {};
@@ -719,7 +777,7 @@ namespace common::common_reference_detail
   };
 }
 
-namespace traits
+namespace common
 {
   template<class...Types>
   struct common_reference
