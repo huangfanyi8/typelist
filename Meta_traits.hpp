@@ -2,8 +2,7 @@
 #ifndef META_TRAITS_HPP
 #define META_TRAITS_HPP
 
-#include<type_traits>
-#include<initializer_list>
+#include<utility>
 
 using std::size_t;
 using std::ptrdiff_t;
@@ -29,7 +28,7 @@ namespace meta_base
         using value_type = Value;
         static constexpr value_type value = v;
         constexpr value_type operator()() const { return value; }
-        constexpr  operator value_type() const { return value; }
+        constexpr  explicit operator value_type() const { return value; }
     };
 
     template<bool v>
@@ -221,35 +220,35 @@ namespace meta_base
 //Template similar
 namespace meta_base
 {
-    template<class,class>
-    inline constexpr bool is_similar_v=false;
+  template<class,class>
+  inline constexpr bool is_similar_v=false;
 
-    template<template<class Value,Value...>class A,
-            template<class Value,Value...>class B,
-            class T1,class T2,T1...v1,T2...v2>
-    inline constexpr bool is_similar_v<A<T1,v1...>,B<T2,v2...>> =true;
+  template<template<class Value,Value...>class A,
+          template<class Value,Value...>class B,
+          class T1,class T2,T1...v1,T2...v2>
+  inline constexpr bool is_similar_v<A<T1,v1...>,B<T2,v2...>> =true;
 
-    template<template<class...>class A,
-            template<class...>class B,
-            class...Types,class...Types1>
-    inline constexpr bool is_similar_v<A<Types...>,B<Types1...>> =true;
+  template<template<class...>class A,
+          template<class...>class B,
+          class...Types,class...Types1>
+  inline constexpr bool is_similar_v<A<Types...>,B<Types1...>> =true;
 }
 
 //is_specialization
 namespace meta_base
 {
-    template<template<class...>class Template,class...>
-    struct is_specialization
-            :std::false_type
-    {};
+  template<template<class...>class Template,class...>
+  struct is_specialization
+          :std::false_type
+  {};
 
-    template<template<class...>class Template, class...Types>
-    struct is_specialization<Template,Template<Types...>>
-            :std::true_type
-    {};
+  template<template<class...>class Template, class...Types>
+  struct is_specialization<Template,Template<Types...>>
+          :std::true_type
+  {};
 
-    template<template<class...>class Template, class...Types>
-    inline constexpr bool is_specialization_v = is_specialization<Template, Types...>::value;
+  template<template<class...>class Template, class...Types>
+  inline constexpr bool is_specialization_v = is_specialization<Template, Types...>::value;
 }
 
 //traits
@@ -311,14 +310,11 @@ namespace meta_base
 
 }
 
+//index subscript
 namespace meta_base
 {
-  //长度为0 不考虑
-  //长度为1
-  //-1 extent_v<T>-1
-  //-2 extent_v<T>-2
   template<ptrdiff_t index,class TypeList>
-  inline constexpr ptrdiff_t index_conversion
+  inline constexpr ptrdiff_t Index_conversion_v
     =index<0?static_cast<ptrdiff_t>(extent_v<TypeList>)+index:index;
   
   template<class List,ptrdiff_t Idx,bool=(Idx>0)>
@@ -343,10 +339,5 @@ namespace meta_base
   
   template<class Template,ptrdiff_t Idx>
   inline constexpr bool Is_out_of_range_v=Out_of_range<Template,Idx>::value;
-  
-
 }
-
-namespace meta_base::experimental{}
-
 #endif

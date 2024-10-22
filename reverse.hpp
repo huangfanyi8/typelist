@@ -43,8 +43,5 @@ namespace meta_base
 
     template<class Template>
     using reverse_t=typename reverse<Template>::type;
-
-    template<class...>class T{};
-
 }
 #endif
