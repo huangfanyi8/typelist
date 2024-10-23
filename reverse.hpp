@@ -11,7 +11,7 @@ namespace common
   template<class List,bool=is_normal_v<List>>
   class _reverse
   {
-    static_assert(is_correct_v<List>,"incorrect!");
+    static_assert(is_template_v<List>,"incorrect!");
   private:
     using P=remove_cvref_t<List>;
     
@@ -33,7 +33,7 @@ namespace common
   template<class List>
   class _reverse<List,false>
   {
-    static_assert(is_correct_v<List>,"incorrect!");
+    static_assert(is_template_v<List>,"incorrect!");
   private:
     using P=remove_cvref_t<List>;
     
@@ -52,7 +52,7 @@ namespace common
     using type=copy_cvref_t<List,_type>;
   };
   
-  template<class List,class=std::enable_if_t<is_correct_v<List>>>
+  template<class List,class=std::enable_if_t<is_template_v<List>>>
   struct reverse
     :_reverse<List>
   {};
@@ -60,4 +60,5 @@ namespace common
   template<class Template>
   using reverse_t=typename reverse<Template>::type;
 }
+
 #endif
