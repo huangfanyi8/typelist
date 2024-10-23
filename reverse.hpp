@@ -2,46 +2,62 @@
 #ifndef REVERSE_HPP
 #define REVERSE_HPP
 
+#include"common.hpp"
 #include"merge.hpp"
 
 ///reverse
-namespace meta_base
+namespace common
 {
-    template<class List,bool=is_normal_v<List>>
-    class reverse
-    {
-    private:
-        template<class T,class E>
-        struct Impl
-                :type_identity<E>
-        {};
+  template<class List,bool=is_normal_v<List>>
+  class _reverse
+  {
+    static_assert(is_correct_v<List>,"incorrect!");
+  private:
+    using P=remove_cvref_t<List>;
+    
+    template<class T,class E>
+    struct Impl
+      :type_identity<E>
+    {};
 
-        template<template<class...> class Template,class E,class Head,class...Rest>
-        struct Impl<Template<Head,Rest...>,E>
-                :Impl<Template<Rest...>,merge_t<Template<Head>,E>>
-        {};
-    public:
-        using type=typename Impl<List,empty_t<List>>::type;
-    };
+    template<template<class...> class Template,class E,class Head,class...Rest>
+    struct Impl<Template<Head,Rest...>,E>
+      :Impl<Template<Rest...>,merge_t<Template<Head>,E>>
+    {};
+  private:
+    using _type=typename Impl<P,make_empty_t<P>>::type;
+  public:
+    using type=copy_cvref_t<List,_type>;
+  };
 
-    template<class List>
-    class reverse<List,false>
-    {
-    private:
-        template<class,class Empty>
-        struct Impl
-                :type_identity<Empty>
-        {};
+  template<class List>
+  class _reverse<List,false>
+  {
+    static_assert(is_correct_v<List>,"incorrect!");
+  private:
+    using P=remove_cvref_t<List>;
+    
+    template<class,class Empty>
+    struct Impl
+            :type_identity<Empty>
+    {};
 
-        template<template<class Value,Value...> class Template,class Empty,class Value,Value Head,Value...Rest>
-        struct Impl<Template<Value,Head,Rest...>,Empty>
-                :Impl<Template<Value,Rest...>,merge_t<Template<Value,Head>,Empty>>
-        {};
-    public:
-        using type=typename Impl<List,empty_t<List>>::type;
-    };
+    template<template<class Value,Value...> class Template,class Empty,class Value,Value Head,Value...Rest>
+    struct Impl<Template<Value,Head,Rest...>,Empty>
+            :Impl<Template<Value,Rest...>,merge_t<Template<Value,Head>,Empty>>
+    {};
+  private:
+    using _type=typename Impl<P,make_empty_t<P>>::type;
+  public:
+    using type=copy_cvref_t<List,_type>;
+  };
+  
+  template<class List,class=std::enable_if_t<is_correct_v<List>>>
+  struct reverse
+    :_reverse<List>
+  {};
 
-    template<class Template>
-    using reverse_t=typename reverse<Template>::type;
+  template<class Template>
+  using reverse_t=typename reverse<Template>::type;
 }
 #endif
