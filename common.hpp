@@ -1,9 +1,9 @@
 /*
  * copy_ref<A,B> 拷贝A的引用属性给B
  * copy_cv<A,B> 拷贝A的cv属性给B
- * get_n switch_t 获取列表中第n个type，下标从0开始
+ * switch_t 获取列表中第n个type，下标从0开始
  * similar<A,B>：如果A,B是模板，只有在相等ref与cv属性下返回true type，否则返回false type
- *
+ * map<T,Pred> 将Prd属性叠加给T
  * */
 
 
