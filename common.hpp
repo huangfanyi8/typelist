@@ -49,6 +49,25 @@ __cplusplus >= VERSION || (defined(_MSVC_LANG) && _MSVC_LANG >= VERSION)
 //constant sequence
 namespace common
 {
+  enum class Error
+  {
+    S_error
+  };
+  
+  //all attribute
+  enum class TypeAttribute
+  {
+    S_lvalue_reference,
+    S_rvalue_reference,
+    S_pointer,
+    S_cv,
+    S_cvp,
+    S_const,
+    S_cp,
+    S_volatile,
+    S_vp
+  };
+  
   class undefined{};
   
   template<class  Type>
@@ -61,6 +80,7 @@ namespace common
   struct constant_sequence
   {
     using value_type = Value;
+    using self=constant_sequence;
     static constexpr size_t size = sizeof...(value);
 
     template<template<class Other,Other...>class Template,class Other,Other...other>
@@ -71,9 +91,13 @@ namespace common
   struct constant
   {
     using value_type = Value;
+    using self=constant;
     static constexpr value_type value = v;
     constexpr value_type operator()() const { return value; }
     constexpr  explicit operator value_type() const { return value; }
+    
+    template<class Other,Other _v>
+    using rebind=constant<Other,_v>;
   };
 
   template<bool v>
@@ -81,7 +105,12 @@ namespace common
   
   template<size_t v>
   using index_constant=constant<size_t,v>;
+  
+  template<size_t v>
+  using index_constant=constant<size_t,v>;
 
+  using error_constant=constant<Error,Error::S_error>;
+  
   template<size_t...v>
   using normal_sequence=constant_sequence<size_t,v...>;
 
@@ -135,9 +164,9 @@ namespace common
   template<class Type, template<class >class...Pred>
   using map_t=typename map<Type,Pred...>::type;
   
-  template<class Type>
+  template<class T>
   struct remove_cvref
-    :map<Type,std::remove_reference,std::remove_const>
+    :std::remove_cv<std::remove_reference_t<T>>
   {};
   
   template<class Type>
@@ -158,30 +187,24 @@ namespace common
   
   template<class>
   struct _meta_traits
-  {};
+  {
+    static_assert(false,"T must be a variadic template");
+  };
   
   template<template<class ...> class Template, class...Types>
   struct _meta_traits<Template<Types...>>
     : type_identity<Template<>>,
-      index_constant<sizeof...(Types)> {
-    static constexpr bool S_correct = true;
+      index_constant<sizeof...(Types)>
+  {
     static constexpr bool S_normal = true;
   };
   
   template<template<class Value, Value...> class Template, class Value, Value...value>
   struct _meta_traits<Template<Value, value...>>
     : type_identity<Template<Value>>,
-      index_constant<sizeof...(value)> {
-    static constexpr bool S_correct = true;
+      index_constant<sizeof...(value)>
+  {
     static constexpr bool S_normal = false;
-  };
-  
-  template<template<class Value, Value...> class Template, class Value>
-  class _meta_traits<Template<Value>>
-    : type_identity<Template<Value>>,
-      index_constant<0> {
-    static constexpr bool S_normal = false;
-    static constexpr bool S_correct = true;
   };
   
   template<class T>
@@ -190,13 +213,10 @@ namespace common
   {};
 
   template<class List>
-  using make_empty_t = typename meta_traits<List>::type;
+  using make_empty_t = typename meta_traits<remove_cvref_t<List>>::type;
   
   template<class List>
   INLINE constexpr bool is_empty_v = !meta_traits<List>::value;
-  
-  template<class List>
-  INLINE constexpr bool is_correct_v = meta_traits<List>::S_correct;
   
   template<class List>
   INLINE constexpr bool is_normal_v = meta_traits<List>::S_normal;
@@ -209,9 +229,10 @@ namespace common
   
   template<class T>
   INLINE constexpr bool is_template_v = _is_template_v<remove_cvref_t<T>>;
+
 }
 
-//switch , binary_t
+//switch , get_n
 namespace common
 {
   template<std::ptrdiff_t index,class...Types>
@@ -254,61 +275,9 @@ namespace common
     using type=typename Impl<S_index_v,void,Types...>::type;
   };
   
-  #if NON_STL_20
-  template<class Template,std::ptrdiff_t Idx>
-  struct get_n
-  {
-    using ptrdiff_t=std::ptrdiff_t;
-    
-    static constexpr auto S_idx
-      =Idx>=0?
-      Idx:
-      ptrdiff_t(extent_v<Template>)+Idx;
-    
-    template<ptrdiff_t c,class List>
-    struct Impl
-      :std::type_identity<undefined>
-    {};
-    
-    template<template<class...>class List,class Head,class...Rest>
-    struct Impl<0,List<Head,Rest...>>
-      :std::type_identity<Head>
-    {};
-    
-    template<ptrdiff_t c,template<class...>class List,
-      class Head,class Second,class...Rest>
-    requires(c>0)
-    struct Impl<c,List<Head,Second,Rest...>>
-      :Impl<c-1,List<Second,Rest...>>
-    {};
-  public:
-    using type=typename Impl<S_idx,std::remove_cvref_t<Template>>::type;
-  };
-  #else
-  template<class Template,std::ptrdiff_t Idx>
-  struct _get_n
-  {};
-  
-  template<template<class...>class Template,std::ptrdiff_t Idx,class...Types>
-  struct _get_n<Template<Types...>,Idx>
-    ::Switch<Idx,Types...>
-  {};
-  
-  template<class Template,std:ptrdiff_t Idx>
-  struct get_n
-    :_get_n<remove_cvref_t<Template>,Idx>
-  {};
-  #endif
-  
-  template<class Template,std::ptrdiff_t Idx>
-  using get_n_t=typename get_n<Template,Idx>::type;
   
   template<std::ptrdiff_t Idx,class...Types>
   using switch_t=typename Switch<Idx,void,Types...>::type;
-
-  //std::conditional_t
-  template<bool C,class T,class U>
-  using binary_t=switch_t<C,U,T>;
 }
 
 //copy
@@ -324,11 +293,18 @@ namespace common
           >
   {};
 
-  template<class Input,class Output,bool R=std::is_rvalue_reference_v<Input>,bool L=std::is_lvalue_reference_v<Input>>
+  template<class Input,class Output,
+    bool R=std::is_rvalue_reference_v<Input>,
+    bool L=std::is_lvalue_reference_v<Input>>
   struct copy_ref
-          :binary_t<R,std::add_rvalue_reference<Output>,
-          binary_t<L,std::add_lvalue_reference<Output>,Output>
+          :std::conditional_t<R,std::add_rvalue_reference<Output>,
+          std::conditional_t<L,std::add_lvalue_reference<Output>,type_identity<Output>>
           >
+  {};
+
+  template<class Input,class Output>
+  struct copy_cvref
+    :copy_ref<Input,typename copy_cv<std::remove_reference_t<Input>,Output>::type>
   {};
 
   template<class Input, class Output>
@@ -336,9 +312,10 @@ namespace common
 
   template<class Input, class Output>
   using copy_ref_t = typename copy_ref<Input, Output>::type;
-  
+
   template<class Input, class Output>
-  using copy_cvref_t=copy_ref_t<copy_cv_t<Input,std::remove_reference_t<Output>>,Output>;
+  using copy_cvref_t=typename copy_cvref<Input,Output>::type;
+
 }
 
 //is_same
@@ -796,5 +773,32 @@ namespace common
   
   template<class...Types>
   using common_reference_t=typename common_reference<Types...>::type;
+}
+
+namespace common
+{
+  template<class...>class _aux{};
+  
+  template<template<class...>class Template,class...T>
+  CONSTEVAL auto extent(const Template<T...>&)
+  {
+    return sizeof...(T);
+  }
+  
+  template<ptrdiff_t Idx,class T>
+  #if NON_STL_20
+  requires (is_template_v<T>)
+  #endif
+  INLINE constexpr auto _conversion_v=Idx>=0
+    ?Idx
+    :Idx+ptrdiff_t(extent_v<T>);
+  
+  template<class List,ptrdiff_t Idx,ptrdiff_t Extent=ptrdiff_t(extent_v<List>),bool v=(Idx>0)>
+  struct _out_of_range
+    :bool_constant<(Idx>0)?(Idx>Extent):(Idx<-Extent)>
+  {};
+  
+  template<class T,ptrdiff_t Idx>
+  INLINE constexpr bool _is_out_of_range=_out_of_range<T,Idx>::value;
 }
 #endif
