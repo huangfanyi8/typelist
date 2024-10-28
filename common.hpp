@@ -103,6 +103,9 @@ namespace common
   template<bool v>
   using bool_constant=constant<bool,v>;
   
+  using true_type=bool_constant<true>;
+  using false_type=bool_constant<false>;
+  
   template<size_t v>
   using index_constant=constant<size_t,v>;
   
@@ -202,7 +205,7 @@ namespace common
   template<template<class Value, Value...> class Template, class Value, Value...value>
   struct _meta_traits<Template<Value, value...>>
     : type_identity<Template<Value>>,
-      index_constant<sizeof...(value)>
+      constant<Value,sizeof...(value)>
   {
     static constexpr bool S_normal = false;
   };
@@ -800,5 +803,31 @@ namespace common
   
   template<class T,ptrdiff_t Idx>
   INLINE constexpr bool _is_out_of_range=_out_of_range<T,Idx>::value;
+}
+
+namespace common
+{
+  template<class T, template<class,class>class Traits>
+  struct is_satisfied
+    :std::true_type
+  {};
+  
+  template<class T, class,template<class,class>class Traits>
+  struct _is_satisfied
+    :bool_constant<false>
+  {};
+  template<template<class...>class TL,class T,class...Types,template<class,class>class Traits>
+  struct _is_satisfied<TL<Types...>,T,Traits>
+    :bool_constant<(Traits<T,Types>::value&&...)>
+  {};
+  
+  template<template<class...>class TL,class A,class...Rest,template<class,class>class Traits>
+  struct is_satisfied<TL<A,Rest...>,Traits>
+    :std::conditional_t<_is_satisfied<TL<Rest...>,A,Traits>::value,
+    is_satisfied<TL<Rest...>,Traits>,
+    std::false_type>
+  {};
+  
+  static_assert(is_satisfied<_aux<int,int,int>,is_same>::value);
 }
 #endif
