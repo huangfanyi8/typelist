@@ -814,8 +814,9 @@ namespace common
   
   template<class T, class,template<class,class>class Traits>
   struct _is_satisfied
-    :bool_constant<false>
+    :false_type
   {};
+  
   template<template<class...>class TL,class T,class...Types,template<class,class>class Traits>
   struct _is_satisfied<TL<Types...>,T,Traits>
     :bool_constant<(Traits<T,Types>::value&&...)>
@@ -825,7 +826,7 @@ namespace common
   struct is_satisfied<TL<A,Rest...>,Traits>
     :std::conditional_t<_is_satisfied<TL<Rest...>,A,Traits>::value,
     is_satisfied<TL<Rest...>,Traits>,
-    std::false_type>
+    false_type>
   {};
   
   static_assert(is_satisfied<_aux<int,int,int>,is_same>::value);
