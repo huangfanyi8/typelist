@@ -198,18 +198,20 @@ namespace common
   
   template<template<class ...> class Template, class...Types>
   struct _meta_traits<Template<Types...>>
-    : type_identity<Template<>>,
-      index_constant<sizeof...(Types)>
   {
+    using type=Template<>;
     static constexpr bool S_normal = true;
+    using value_type=undefined;
+    static constexpr size_t size= sizeof...(Types);
   };
   
   template<template<class Value, Value...> class Template, class Value, Value...value>
   struct _meta_traits<Template<Value, value...>>
-    : type_identity<Template<Value>>,
-      constant<Value,sizeof...(value)>
   {
+    using type=Template<Value>;
     static constexpr bool S_normal = false;
+    using value_type=Value;
+    static constexpr size_t size= sizeof...(value);
   };
   
   template<class T>
@@ -221,7 +223,10 @@ namespace common
   using make_empty_t = typename meta_traits<remove_cvref_t<List>>::type;
   
   template<class List>
-  INLINE constexpr bool is_empty_v = !meta_traits<List>::value;
+  using make_empty = type_identity<make_empty_t<List>>;
+  
+  template<class List>
+  INLINE constexpr bool is_empty_v = !meta_traits<List>::size;
   
   template<class List>
   INLINE constexpr bool is_normal_v = meta_traits<List>::S_normal;
@@ -230,7 +235,7 @@ namespace common
   using traits_value_t = typename meta_traits<Template>::value_type;
   
   template<class Template>
-  INLINE constexpr auto extent_v = meta_traits<Template>::value;
+  INLINE constexpr auto extent_v = meta_traits<Template>::size;
   
   template<class T>
   INLINE constexpr bool is_template_v = _is_template_v<remove_cvref_t<T>>;
