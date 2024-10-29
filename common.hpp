@@ -33,9 +33,11 @@ __cplusplus >= VERSION || (defined(_MSVC_LANG) && _MSVC_LANG >= VERSION)
 #if NON_STL_17
 #define INLINE inline
 #define PRIVATE_INLINE inline
+#define AUTO(...) auto
 #else
 #define INLINE
 #define PRIVATE_INLINE
+#define AUTO(...) traits_value_t<__VA_ARGS__>
 #endif
 
 #if NON_STL_20
@@ -830,5 +832,34 @@ namespace common
   {};
   
   static_assert(is_satisfied<_aux<int,int,int>,is_same>::value);
+}
+
+namespace common
+{
+  #if NON_STL_20
+  
+  template<class T>
+  concept UnaryPred=requires
+  {
+    T::value;
+    std::convertible_to<decltype(T::value),bool>;
+  };
+  #endif
+  
+  template<class,class=void>
+  struct _is_constant
+    :false_type
+  {};
+  
+  template<template<class V,V>class Constant,
+  class V,V v>
+  struct _is_constant<Constant<V,v>,std::void_t<typename Constant<V,v>::self>>
+    :true_type
+  {};
+  
+  template<class T>
+  struct is_constant
+    :_is_constant<remove_cvref_t<T>>
+  {};
 }
 #endif
