@@ -1,3 +1,10 @@
+/*c++ 14 c++17 c++20实现的轻量级元编程库，
+ * 包含对标准库的扩展以及type_list相关的多种算法
+ * */
+
+#ifndef DONG_DONG_COMMON_HPP
+#define DONG_DONG_COMMON_HPP
+
 #include<type_traits>
 #include<cstddef>
 
@@ -108,6 +115,9 @@ namespace common
   
   template<class C>
   using _prev_t=typename _prev<C>::type;
+  
+  template<ptrdiff_t v>
+  using range_constant=constant<ptrdiff_t ,v>;
   
   template<size_t v>
   using index_constant=constant<size_t,v>;
@@ -694,7 +704,7 @@ namespace common
     S_take,
     S_sub,
     S_equal_range,
-    S_erase,
+    S_insert,
     S_insert_if
   };
   
@@ -749,17 +759,17 @@ namespace common
       :bool_constant<_first_pos<0,is_same,TL,T>::value!=-1>
     {};
     
-    template<class,class>
+    template<template<class V,V...>class,class,class>
     struct _traits
     {};
     
-    template<class V,V...v>
-    struct _traits<V,_aux<constant<V,v>...>>
-      :type_identity<constant_sequence<V,v...>>
+    template<template<class V,V...>class Sequence,class V,V...v>
+    struct _traits<Sequence,V,_aux<constant<V,v>...>>
+      :type_identity<Sequence<V,v...>>
     {};
     
-    template<class V,class TL>
-    using _traits_t=typename _traits<V,TL>::type;
+    template<template<class V,V...>class S,class V,class TL>
+    using _traits_t=typename _traits<S,V,TL>::type;
   };
 }
 //unique
@@ -798,7 +808,7 @@ namespace common
     using _type=copy_cvref_t<_sequence,typename _base::type>;
   public:
     static constexpr bool value=_base::value;
-    using type=_traits_t<V,_type>;
+    using type=_traits_t<TL,V,_type>;
   };
 }
 ///reverse
@@ -950,7 +960,7 @@ namespace common
   struct _take<Sequence<ValueType,value...>,Idx>
     :_common_pred
   {
-    using type=_traits_t<ValueType,typename _take<_aux<constant<ValueType,value>...>,Idx>::type>;
+    using type=_traits_t<Sequence,ValueType,typename _take<_aux<constant<ValueType,value>...>,Idx>::type>;
   };
 }
 //splice
@@ -1026,92 +1036,166 @@ namespace common
     :_equal_range<_aux<constant<V,v>...>,Traits,P...>
   {};
 }
-//insert insert_if
+/* erase_if
+ * insert_if
+ * remove
+ * */
 namespace common
 {
-  //insert_if
+  //insert_if erase_if
   template<template<class...>class List,
     template<class,class...>class Pred,
+      class Bool,
     class Head,class...Rest,
     class...Para,
     class...Increments>
-  struct _filter<Category::S_insert_if,List<Head,Rest...>,Pred,List<Increments...>,Para...>
+  struct _filter<Category::S_insert_if,List<Head,Rest...>,Pred,List<Increments...>,Bool,Para...>
     :std::conditional_t<Pred<Head,Para...>::value,
-      merge<List<Increments...,Head>,
-        typename _filter<Category::S_insert_if,List<Rest...>,Pred,List<Increments...>,Para...>::type>,
+      merge<std::conditional_t<Bool::value,List<Increments...,Head>,List<>>,
+        typename _filter<Category::S_insert_if,List<Rest...>,Pred,List<Increments...>,Bool,Para...>::type>,
       merge<List<Head>,
-        typename _filter<Category::S_insert_if,List<Rest...>,Pred,List<Increments...>,Para...>::type>
+        typename _filter<Category::S_insert_if,List<Rest...>,Pred,List<Increments...>,Bool,Para...>::type>
     >
   {};
   
-  template<class List,template<class,class...>class Pred,class...Para,class Add>
-  struct _filter<Category::S_insert_if,List,Pred,Add,Para...>
+  template<class List,template<class,class...>class Pred,class...Para,class Add,class Bool>
+  struct _filter<Category::S_insert_if,List,Pred,Add,Bool,Para...>
     :make_empty<List>
   {};
   
   //insert_if
-  template<class,template<class,class...>class,class...>
-  struct _insert_if
+  template<class,template<class,class...>class,class,class...>
+  struct _insert_or_erase_if
     :type_identity<undefined>
   {};
   
   //insert_if
   template<template<class...>class List,
     template<class,class...>class Pred,
+      class Bool,
     class...Add,class...Types,class...Other>
-  struct _insert_if<List<Types...>,Pred,List<Add...>,Other...>
-    : _filter<Category::S_insert_if,List<Types...>,Pred,List<Add...>,Other...>
+  struct _insert_or_erase_if<List<Types...>,Pred,List<Add...>,Bool,Other...>
+    : _filter<Category::S_insert_if,List<Types...>,Pred,List<Add...>,Bool,Other...>
   {};
   
   //insert_if_c
   template<template<class V,V...>class List,
     template<class,class...>class Pred,
+      class Bool,
     class V,V...Add,V...v,class...Para>
-  struct _insert_if<List<V,v...>,Pred,List<V,Add...>,Para...>
+  struct _insert_or_erase_if<List<V,v...>,Pred,List<V,Add...>,Bool,Para...>
     :_common_pred
   {
   private:
     using _sequence=_aux<constant<V,v>...>;
     using _add=_aux<constant<V,Add>...>;
-    using _base=typename _filter<Category::S_insert_if,_sequence,Pred,_add,Para...>::type;
+    using _base=typename _filter<Category::S_insert_if,_sequence,Pred,_add,Bool,Para...>::type;
   public:
-    using type=_traits_t<V,_base>;
+    using type=_traits_t<List,V,_base>;
   };
   
   template<class Template,template<class,class...>class Predicate,
     class AddList,class...Para>
-  using _insert_if_t=typename _insert_if<Template,Predicate,AddList,Para...>::type;
+  using _insert_if_t=typename _insert_or_erase_if<Template,Predicate,AddList,true_type,Para...>::type;
+  
+  //erase_if_t base
+  template<class Template,template<class,class...>class Pred,class...Other>
+  using  _erase_if_t=typename _insert_or_erase_if<Template,Pred,make_empty_t<Template>,false_type,Other...>::type;
+  
+  //移除相同的元素
+  template<class Template,class T>
+  using _remove_t=_erase_if_t<Template,is_same,T>;
+}
+/* erase
+ * insert
+ *
+ * */
+namespace common
+{
+  //插入(Idx)
+  template<template<class...>class List,class Head,class...Rest,
+    template<class,class...>class Pred,
+    class AddList,
+    class Bool,
+    class Index,class Zero,
+    class Out>
+  struct _filter<Category::S_insert,List<Head,Rest...>,Pred,Out,AddList,Zero,Index,Bool>
+    :std::conditional_t<Pred<Zero,Index>::value,
+      std::conditional_t<Bool::value,merge<Out,AddList,List<Head,Rest...>>,merge<Out,List<Rest...>>>,
+      _filter<Category::S_insert,List<Rest...>,Pred,merge_t<Out,List<Head>>,AddList,_next_t<Zero>,Index,Bool>
+    >//conditional_t
+  {};
+  
+  template<class List,
+    template<class,class...>class Pred,
+    class AddList,
+    class Bool,
+    class Index,class Zero,
+    class Out>
+  struct _filter<Category::S_insert,List,Pred,Out,AddList,Zero,Index,Bool>
+    :type_identity<Out>
+  {};
+  
+  //erase
+  template<class Template,ptrdiff_t Idx,class AddList,class Bool>
+  struct _erase_or_insert
+    :type_identity<undefined>
+  {};
+  
+  template<template<class...>class Template/*Type List*/,
+    ptrdiff_t Idx/*insert pos*/,
+    class Bool,
+    class...Add,class...Types>
+  struct _erase_or_insert<Template<Types...>,Idx,Template<Add...>,Bool>
+  {
+  private:
+    using _self=Template<Types...>;
+    using _add=Template<Add...>;
+    static constexpr auto S_out_of_range=_is_out_of_range<_self,Idx>;
+    static constexpr auto S_index_v=_conversion_v<Idx,_self>;
+    
+    using _type=std::conditional_t<(S_index_v>=0),
+      Template<Types...,Add...>,
+      Template<Add...,Types...>>;
+    
+    using _base=_filter<Category::S_insert,_self,is_same,make_empty_t<_self>,_add,
+      constant<ptrdiff_t,0>,constant<ptrdiff_t,_conversion_v<Idx,_self>>,Bool>;
+  public:
+    using type=std::conditional_t<S_out_of_range,_type,typename _base::type>;
+  };
+  //erase
+  template<template<class V,V...>class Template,ptrdiff_t Idx,class V,V...v,V...add,class Bool>
+  struct _erase_or_insert<Template<V,v...>,Idx,Template<V,add...>,Bool>
+    :_common_pred
+  {
+  private:
+    using _sequence=_aux<constant<V,v>...>;
+    using _base=typename _erase_or_insert<_sequence,Idx,_aux<constant<V,add>...>,Bool>::type;
+  public:
+    using type=_traits_t<Template,V,_base>;
+  };
   
   //insert
   template<class/*Type List*/,
     ptrdiff_t/*insert pos*/,
     class...>
   struct _insert
+    :type_identity<undefined>
+  {};
+  
+    //erase
+  template<class/*Type List*/,
+    ptrdiff_t>
+  struct _erase
+    :type_identity<undefined>
   {};
   
   template<template<class...>class Template/*Type List*/,
     ptrdiff_t Idx/*insert pos*/,
     class...Add,class...Types>
   struct _insert<Template<Types...>,Idx,Add...>
-    :_common_pred
-  {
-  private:
-    using _self=Template<Types...>;
-    static constexpr auto S_out_of_range=_is_out_of_range<_self,Idx>;
-    static constexpr auto S_index_v=_conversion_v<Idx,_self>;
-    
-    using _type=std::conditional_t<(S_index_v>=0),
-    Template<Types...,Add...>,
-    Template<Add...,Types...>>;
-    
-    template<class A,class B>
-    using _same=bool_constant<_first_index<A,B>::value ==S_index_v>;
-    
-  public:
-    using type=std::conditional_t<S_out_of_range,
-    _type,typename
-    _filter<Category::S_insert_if,_self,_same,Template<Add...>,_self>::type>;
-  };
+    :_erase_or_insert<Template<Types...>,Idx,Template<Add...>,true_type>
+  {};
   
   template<template<class V,V...>class TL/*Type List*/,
     ptrdiff_t Idx/*insert pos*/,
@@ -1124,87 +1208,31 @@ namespace common
     using _sequence=_aux<constant<V,v>...>;
     using _base=typename _insert<_sequence,Idx,constant<V,add>...>::type;
   public:
-    using type=_traits_t<V,_base>;
+    using type=_traits_t<TL,V,_base>;
   };
-}
-/* erase
- * erase_if
- * remove*/
-namespace common
-{
-  //过滤掉满足Pred的元素
-  template<template<class...>class List,class Head,class...Rest,
-    template<class,class...>class Pred,
-    class...Other,class Out>
-  struct _filter<Category::S_erase,List<Head,Rest...>,Pred,Out,Other...>
-    :std::conditional_t<Pred<Head,Other...>::value,
-      _filter<Category::S_erase,List<Rest...>,Pred,Out,Other...>,
-      _filter<Category::S_erase,List<Rest...>,Pred,merge_t<Out,List<Head>>,Other...>
-    >//conditional_t
+  
+  template<class TL/*Type List*/,
+    ptrdiff_t Idx/*insert pos*/,
+    class...Add>
+  using _insert_t=typename _insert<TL,Idx,Add...>::type;
+  
+  template<template<class...>class Template/*Type List*/,
+    ptrdiff_t Idx/*insert pos*/,class...Types>
+  struct _erase<Template<Types...>,Idx>
+    :_erase_or_insert<Template<Types...>,Idx,Template<>,false_type>
   {};
   
-  //过滤掉满足Pred的元素
-  template<class List,
-    template<class,class...>class Pred,
-    class...Other,class Out>
-  struct _filter<Category::S_erase,List,Pred,Out,Other...>
-    :type_identity<Out>
-  {};
-  
-  //erase_if base
-  template<class Template,template<class,class...>class Pred,class...Other>
-  struct _erase_if
-    :_filter<Category::S_erase,Template,Pred,make_empty_t<Template>,Other...>
-  {};
-  
-  //erase_if_t base
-  template<class Template,template<class,class...>class Pred,class...Other>
-  using  _erase_if_t=typename _erase_if<Template,Pred,Other...>::type;
-  
-  //remove(删除所有的T)
-  template<class List,class T>
-  struct _remove
-    :_erase_if<List,is_same,T>
-  {};
-  
-  template<template<class V,V...>class L,class V,V...v,V aim>
-  struct _remove<L<V,v...>,constant<V,aim>>
+  template<template<class V,V...>class TL/*Type List*/,
+    ptrdiff_t Idx/*insert pos*/,
+    class V,V...v>
+  struct _erase<TL<V,v...>,Idx>
     :_common_pred
   {
   private:
     using _sequence=_aux<constant<V,v>...>;
+    using _base=typename _erase<_sequence,Idx>::type;
   public:
-    using type=_traits_t<V,typename _remove<_sequence,constant<V,aim>>::type>;
-  };
-  //移除相同的元素
-  template<class Template,class T>
-  using _remove_t=typename _remove<Template,T>::type;
-  
-  //erase
-  template<class Template,ptrdiff_t Idx>
-  struct _erase
-    :_common_pred
-  {
-  private:
-    using _self=Template;
-    static constexpr auto S_index_v=_conversion_v<Idx,_self>;
-    
-    template<class A/*Type*/,class B/*TypeList*/>
-    using _same=bool_constant<_first_index<A,B>::value ==S_index_v>;
-  public:
-    using type=typename
-    _filter<Category::S_erase,_self,_same,make_empty_t<_self>,_self>::type;
-  };
-  
-  //erase
-  template<template<class V,V...>class Template,ptrdiff_t Idx,class V,V...v>
-  struct _erase<Template<V,v...>,Idx>
-    :_common_pred
-  {
-  private:
-    using _sequence=_aux<constant<V,v>...>;
-  public:
-    using type=_traits_t<V,typename _erase<_sequence,Idx>::type>;
+    using type=_traits_t<TL,V,_base>;
   };
   
   //erase_t
@@ -1215,7 +1243,7 @@ namespace common
 namespace common
 {
   template<class TL,ptrdiff_t I>
-  struct rotate
+  struct _rotate
   {
   private:
     static constexpr auto S_index_v=extent_v<TL>!=0
@@ -1231,7 +1259,7 @@ namespace common
     struct Impl<L<H,R...>,Index,false>
       :std::conditional_t<Index==S_index_v,
       type_identity<L<H,R...>>,
-      Impl<L<R...,H>,Index+1>>
+      Impl<L<R...,H>,Index-1>>
     {};
     
     template<class,class...>struct prepend{};
@@ -1248,48 +1276,95 @@ namespace common
     struct Impl<L<H,R...>,Index,true>
       :std::conditional_t<Index==S_index_v,
         type_identity<L<H,R...>>,
-        Impl<prepend_t<_erase_t<L<H,R...>,-1>,get_n_t<L<H,R...>,-1>>,Index-1>>
+        Impl<prepend_t<_erase_t<L<H,R...>,-1>,get_n_t<L<H,R...>,-1>>,Index+1>>
     {};
     
   public:
     using type=typename Impl<TL,0>::type;
   };
-  
 }
 /*sort*/
 namespace common
 {
-  template<class TL,class Output,class Back,template<class,class>class BinaryPred>
+  template<template<class,class>class Traits,class L,class R>
+  using _equal_pred=bool_constant<!Traits<L,R>::value&&!Traits<R,L>::value>;
+  
+  template<template<class,class>class Traits,class L,class R>
+  INLINE constexpr auto _three_way_comparison_v=Traits<L,R>::value||_equal_pred<Traits,L,R>::value
+  ?true
+  :false;
+  
+  template<class TL,template<class...>class BinaryPred>
   struct _insertion_sort
-    :type_identity<Output>
-  {};
-  
-  template<template<class...>class TL,
-    class O,
-    class Back,
-    template<class,class>class B,
-    class Head,class...Rest>
-  struct _insertion_sort<TL<Head,Rest...>,O,Back,B>
-    :std::conditional_t<B<Back,Head>::value,
-      _insertion_sort<TL<Rest...>,merge_t<O,TL<Head>>,Back,B>,
-      _insertion_sort<TL<Rest...>,_insert_if_t<O,B,TL<Back>,Back>,Back,B>
-    >
-  {};
-  
-  template<class L,template<class,class>class>
-  struct insertion_sort
-    :type_identity<L>
+    :make_empty<TL>
   {};
   
   template<template<class...>class TL,
     template<class,class>class B,
     class Head,class...Rest>
-  struct insertion_sort<TL<Head,Rest...>,B>
-    :_insertion_sort<TL<Head,Rest...>,TL<Head>,Head,B>
+  struct _insertion_sort<TL<Head,Rest...>,B>
+    :_common_pred
+  {
+  private:
+    template<class L,class R>
+    static constexpr auto S_comparison_v=_three_way_comparison_v<B,L,R>;
+    
+    template<class L,template<class,class...>class Traits,class...Other>
+    static constexpr auto _first_pos_v=_first_pos<0,Traits,L,Other...>::value;
+    
+    template<class L,class R>
+    using _not=B<R,L>;
+    
+    template<class,class Output,class Back>
+    struct Impl
+      :type_identity<Output>
+    {};
+    
+    template<class Output,class Back,template<class...>class List,class H,class...R>
+    struct Impl<List<H,R...>,Output,Back>
+      :std::conditional_t<S_comparison_v<Back,H>,
+        Impl<List<R...>,merge_t<Output,List<H>>,H>,
+        Impl<List<R...>,_insert_t<Output,_first_pos_v<Output,_not,H>,H>,back_t<Output>>>
+    {};
+  public:
+    using type=typename Impl<TL<Head,Rest...>,TL<>,Head>::type;
+  };
+  //1,2,3,4,5,2-->less<l,r>==l<r
+  
+  template<template<class V,V...>class TL,
+    template<class,class>class B,
+      class V,V...v>
+  struct _insertion_sort<TL<V,v...>,B>
+    :_common_pred
+  {
+  private:
+    using _sequence=_aux<constant<V,v>...>;
+  public:
+    using type=_traits_t<TL,V,typename _insertion_sort<_sequence,B>::type>;
+  };
+  
+  template<class L,class R>
+  struct _less
+    :bool_constant<sizeof(L)<sizeof(R)>
   {};
   
+  template<class L,class R>
+  struct _greater
+    :bool_constant<(sizeof(L)> sizeof(R))>
+  {};
+  
+  template<class V,V L,V R>
+  struct _less<constant<V,L>,constant<V,R>>
+    :bool_constant<L<R>
+  {};
+  
+  template<class V,V L,V R>
+  struct _greater<constant<V,L>,constant<V,R>>
+    :bool_constant<(L>R)>
+  {};
+
   template<class L,template<class,class>class B>
-  using insertion_sort_t=typename insertion_sort<L,B>::type;
+  using _insertion_sort_t=typename _insertion_sort<L,B>::type;
 }
 
 namespace common
@@ -1344,6 +1419,18 @@ namespace common
   template<class TL,template<class,class...>class Pred,class...Other>
   using erase_if=type_identity<erase_if_t<TL,Pred,Other...>>;
   
+  template<class TL,ptrdiff_t Idx>
+  using rotate=copy_cvref<TL,typename _rotate<remove_cvref_t<TL>,Idx>::type>;
+  
+  template<class TL,ptrdiff_t Idx>
+  using rotate_t=typename rotate<TL,Idx>::type;
+  
+  template<class L,template<class,class>class B>
+  using insertion_sort_t=copy_cvref_t<L,_insertion_sort_t<L,B>>;
+  
+  template<class L,template<class,class>class B>
+  using insertion_sort=copy_cvref<L,_insertion_sort_t<L,B>>;
+  
   template<class List,template<class,class...>class Traits,class...P>
   INLINE constexpr auto count_if_v=equal_range<List,Traits,P...>::count;
   
@@ -1366,6 +1453,16 @@ namespace common
   template<class...>class TypeList{};
   
   #if 0
+  static_assert(is_same_v<typename _rotate<_aux<int,double>,2>::type,
+    _aux<int,double>>);
+  static_assert(is_same_v<typename _rotate<_aux<int,double,char>,-2>::type,
+    _erase_t<_aux<double,char,int,double>,0>>);
+  
+  static_assert(is_same_v<typename _rotate<_aux<int,double,char>,-4>::type,
+    _aux<double,char,int>>);
+  
+  static_assert(is_same_v<_erase_t<_aux<int>,0>,_aux<>>);
+  static_assert(is_same_v<_erase_t<_aux<int,double,char,int,float,int,double>,1>,_aux<int,char,int,float,int,double>>);
   static_assert(is_same_v<get_n_t<variant<>,0>,common::undefined>);
   static_assert(is_same_v<get_n_t<variant<int>,-100>,undefined>);
   static_assert(is_same_v<front_t<variant<>>,undefined>);
@@ -1557,8 +1654,43 @@ namespace common
   static_assert(is_same_v<take_t<index_sequence<>,77>,index_sequence<>>);
   static_assert(is_same_v<take_t<index_sequence<111>,0>,index_sequence<>>);
   static_assert(is_same_v<take_t<index_sequence<1,11,77>,2>,index_sequence<1,11>>);
+  
+  static_assert(is_same_v<_aux<>,
+    _insertion_sort_t<_aux<>,_less>>);
+  
+  static_assert(is_same_v<_aux<char>,
+    _insertion_sort_t<_aux<char>,_less>>);
+  
+  static_assert(is_same_v<_aux<char,int,double>,
+    _insertion_sort_t<_aux<int,double,char>,_less>>);
+  
+  static_assert(is_same_v<_aux<char,int,float,double>,
+    _insertion_sort_t<_aux<int,double,char,float>,_less>>);
+  
+  static_assert(is_same_v<_aux<>,
+    _insertion_sort_t<_aux<>,_greater>>);
+  
+  static_assert(is_same_v<_aux<char>,
+    _insertion_sort_t<_aux<char>,_greater>>);
+  
+  static_assert(is_same_v<_aux<double,int,char>,
+    _insertion_sort_t<_aux<int,double,char>,_greater>>);
+  
+  static_assert(is_same_v<_aux<double,int,float,char>,
+    _insertion_sort_t<_aux<int,double,char,float>,_greater>>);
+  
+  static_assert(is_same_v<index_sequence<1>,_insertion_sort_t<index_sequence<1>,_less>>);
+  static_assert(is_same_v<index_sequence<>,_insertion_sort_t<index_sequence<>,_less>>);
+  
+  static_assert(is_same_v<index_sequence<1,2,3,4,5,6,7,8,9>,
+    _insertion_sort_t<index_sequence<9,8,6,7,5,4,2,3,1>,_less>>);
+  
+  static_assert(is_same_v<reverse_t<index_sequence<1,2,3,4,5,6,7,8,9>>,
+    _insertion_sort_t<index_sequence<9,8,6,7,5,4,2,3,1>,_greater>>);
   #endif
 }
+
+#endif
 
 
 
