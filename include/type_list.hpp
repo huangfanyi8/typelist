@@ -36,6 +36,22 @@ namespace common
   enum class Error
   {S_error};
   
+  enum ReferenceType
+  {
+    S_lvalue_reference,
+    S_rvalue_reference,
+    S_none
+  };
+  
+  template<class T>
+  INLINE constexpr
+  ReferenceType _reference_cast
+    =std::is_lvalue_reference<T>::value
+     ?S_lvalue_reference
+     :std::is_rvalue_reference<T>::value
+      ?S_rvalue_reference
+      :S_none;
+  
   class undefined{};
   
   template<class...>class _aux
@@ -337,6 +353,16 @@ namespace common
   template<class H,class...R>
   using negation=_logic_pred<2,H,R...>;
   
+  //判断是否具有一样的cv属性，不包括指针
+  template<class L,class R,bool v=(_reference_cast<L> ==_reference_cast<R>)>
+  using is_similar =bool_constant<(std::is_const<L>::value==std::is_const<R>::value)
+                                  &&(std::is_volatile<L>::value==std::is_volatile<R>::value)
+                                  &&v
+                                  &&is_normal_v<L> ==is_normal_v<R>>;
+  
+  template<class L,class R>
+  INLINE constexpr bool is_similar_v=is_similar<L,R>::value;
+  
   template<class H,class...R>
   INLINE constexpr bool conjunction_v = conjunction<H,R...>::value;
   
@@ -417,22 +443,6 @@ namespace common
     template<class> class TQ, template<class> class UQ>
   struct basic_common_reference
   { };
-  
-  enum ReferenceType
-  {
-    S_lvalue_reference,
-    S_rvalue_reference,
-    S_none
-  };
-  
-  template<class T>
-  INLINE constexpr
-  ReferenceType _reference_cast
-    =std::is_lvalue_reference<T>::value
-     ?S_lvalue_reference
-     :std::is_rvalue_reference<T>::value
-      ?S_rvalue_reference
-      :S_none;
   
   template<class T>
   INLINE constexpr bool S_exists_v=!std::is_same<remove_cvref<T>,undefined>::value;
@@ -628,11 +638,11 @@ namespace common
 namespace common
 {
   template<class...Lists>
-  class merge
+  class _merge
   {};
   
   template<class Head,class...Rest>
-  class merge<Head,Rest...>
+  class _merge<Head,Rest...>
   {
   private:
     template<class...>
@@ -667,6 +677,9 @@ namespace common
   public:
     using type=typename Impl<Head,Rest...>::type;
   };
+  
+  template<class...Lists>
+  using merge=_merge<remove_cvref_t<Lists>...>;
   
   template<class...Lists>
   using merge_t=typename merge<Lists...>::type;
@@ -765,18 +778,18 @@ namespace common
   {};
   
   template<class TL,class=std::enable_if_t<is_template_v<TL>>>
-  struct unique
+  struct _unique
     :private _common_pred
   {
   private:
-    using _base=_filter<Category::S_unique,remove_cvref_t<TL>,_first,make_empty_t<TL>,true_type>;
+    using _base=_filter<Category::S_unique,TL,_first,make_empty_t<TL>,true_type>;
   public:
     static constexpr bool value=_base::value;
-    using type=copy_cvref_t<TL,typename _base::type>;
+    using type=typename _base::type;
   };
   
   template<template<class V,V...v>class TL,class V,V...v>
-  struct unique<TL<V,v...>>
+  struct _unique<TL<V,v...>>
     :private _common_pred
   {
   private:
@@ -787,22 +800,14 @@ namespace common
     static constexpr bool value=_base::value;
     using type=_traits_t<V,_type>;
   };
-  
-  template<class TL>
-  using unique_t=typename unique<TL>::type;
-  
-  template<class TL>
-  INLINE constexpr bool is_unique_v=unique<TL>::value;
 }
 ///reverse
 namespace common
 {
-  template<class List,bool=is_normal_v<List>>
-  class _reverse
+  template<class List,bool=is_template_v<List>>
+  class reverse
   {
   private:
-    using P=remove_cvref_t<List>;
-    
     template<class T,class E>
     struct Impl
       :type_identity<E>
@@ -812,38 +817,15 @@ namespace common
     struct Impl<Template<Head,Rest...>,E>
       :Impl<Template<Rest...>,merge_t<Template<Head>,E>>
     {};
-  private:
-    using _type=typename Impl<P,make_empty_t<P>>::type;
-  public:
-    using type=copy_cvref_t<List,_type>;
-  };
-  
-  template<class List>
-  class _reverse<List,false>
-  {
-    static_assert(is_template_v<List>,"incorrect!");
-  private:
-    using P=remove_cvref_t<List>;
-    
-    template<class,class Empty>
-    struct Impl
-      :type_identity<Empty>
-    {};
-    
     template<template<class Value,Value...> class Template,class Empty,class Value,Value Head,Value...Rest>
     struct Impl<Template<Value,Head,Rest...>,Empty>
       :Impl<Template<Value,Rest...>,merge_t<Template<Value,Head>,Empty>>
     {};
   private:
-    using _type=typename Impl<P,make_empty_t<P>>::type;
+    using _type=typename Impl<remove_cvref_t<List>,make_empty_t<List>>::type;
   public:
     using type=copy_cvref_t<List,_type>;
   };
-  
-  template<class List,class=std::enable_if_t<is_template_v<List>>>
-  struct reverse
-    :_reverse<List>
-  {};
   
   template<class Template>
   using reverse_t=typename reverse<Template>::type;
@@ -858,7 +840,7 @@ namespace common
   #if NON_STL_20
   requires (is_template_v<T>)
   #endif
-  class _get_n_base
+  class _get_n
   {
     static_assert(is_template_v<T>,"T must be a variadic template");
     using ptrdiff_t=std::ptrdiff_t;
@@ -907,7 +889,7 @@ namespace common
     {};
   
   public:
-    using type=typename Impl<S_idx,remove_cvref_t<T>>::type;
+    using type=typename Impl<S_idx,T>::type;
   };
   
   template<class T,/*TypeList*/
@@ -915,21 +897,21 @@ namespace common
     class ErrorType/*error type*/
   >
   class get_n
-    :public _get_n_base<T,Idx,ErrorType>
+    :public _get_n<remove_cvref_t<T>,Idx,ErrorType>
   {};
   
   template<class T,/*TypeList*/
     std::ptrdiff_t Idx,/*index sub*/
     class ErrorType=undefined/*error type*/
   >
-  using get_n_t=typename _get_n_base<T,Idx,ErrorType>::type;
+  using get_n_t=typename get_n<T,Idx,ErrorType>::type;
   
   template<class T,/*TypeList*/
     std::ptrdiff_t Idx,/*index sub*/
     class ErrorType=error_constant, /*error type*/
     class=std::enable_if_t<!is_normal_v<T>>
   >
-  INLINE constexpr auto get_n_v=_get_n_base<T,Idx,ErrorType>::type::value;
+  INLINE constexpr auto get_n_v=get_n<T,Idx,ErrorType>::type::value;
   
   template<class Template>
   using front_t = get_n_t<Template,0>;
@@ -970,15 +952,10 @@ namespace common
   {
     using type=_traits_t<ValueType,typename _take<_aux<constant<ValueType,value>...>,Idx>::type>;
   };
-  
-  template<class T,size_t r>
-  struct take
-    :copy_cvref<T,typename _take<remove_cvref_t<T>,r>::type>
-  {};
-  
-  template<class T,size_t r>
-  using take_t=typename take<T,r>::type;
-  
+}
+//splice
+namespace common
+{
   struct in_place_t{explicit in_place_t()=default;};
   template<size_t>struct in_place_index_t{explicit in_place_index_t()=default;};
   template<class>struct in_place_type_t{explicit in_place_type_t()=default;};
@@ -1000,7 +977,6 @@ namespace common
     constexpr auto splice(in_place_t,int)
     {}
   };
-
 }
 //equal_range
 //count
@@ -1049,20 +1025,6 @@ namespace common
   struct _equal_range<T<V,v...>,Traits,P...>
     :_equal_range<_aux<constant<V,v>...>,Traits,P...>
   {};
-  
-  template<class T,template<class,class...>class Traits,class...P>
-  struct equal_range
-    :_equal_range<remove_cvref_t<T>,Traits,P...>
-  {};
-  
-  template<class T,template<class,class...>class Traits,class...P>
-  using equal_range_t=typename equal_range<T,Traits,P...>::type;
-  
-  template<class List,template<class,class...>class Traits,class...P>
-  INLINE constexpr auto count_if_v=equal_range<List,Traits,P...>::count;
-  
-  template<class List,class Type>
-  INLINE constexpr auto count_v=equal_range<List,is_same,Type>::count;
 }
 //insert insert_if
 namespace common
@@ -1164,25 +1126,6 @@ namespace common
   public:
     using type=_traits_t<V,_base>;
   };
-  
-  template<class TL,ptrdiff_t Idx,class...Add>
-  struct insert
-    :copy_cvref<TL,typename _insert<TL,Idx,Add...>::type>
-  {};
-  
-  template<template<class V,V...>class TL,class V,V...v,V...Add,ptrdiff_t Idx>
-  struct insert<TL<V,v...>,Idx,TL<V,Add...>>
-    :copy_cvref<TL<V,v...>,typename _insert<TL<V,v...>,Idx,TL<V,Add...>>::type>
-  {};
-  
-  template<class TL,ptrdiff_t Idx,class...Add>
-  using insert_t=typename insert<TL,Idx,Add...>::type;
-  
-  template<class TL,class...Add>
-  using prepend_t=typename insert<TL,0,Add...>::type;
-  
-  template<class TL,class...Add>
-  using append_t=typename insert<TL,extent_v<TL>,Add...>::type;
 }
 /* erase
  * erase_if
@@ -1209,14 +1152,14 @@ namespace common
   {};
   
   //erase_if base
-  template<class Template,template<class,class...>class BinaryPred,class...Other>
+  template<class Template,template<class,class...>class Pred,class...Other>
   struct _erase_if
-    :_filter<Category::S_erase,Template,BinaryPred,make_empty_t<Template>,Other...>
+    :_filter<Category::S_erase,Template,Pred,make_empty_t<Template>,Other...>
   {};
   
   //erase_if_t base
-  template<class Template,template<class,class...>class BinaryPred,class...Other>
-  using  _erase_if_t=typename _erase_if<Template,BinaryPred,Other...>::type;
+  template<class Template,template<class,class...>class Pred,class...Other>
+  using  _erase_if_t=typename _erase_if<Template,Pred,Other...>::type;
   
   //remove(删除所有的T)
   template<class List,class T>
@@ -1313,21 +1256,6 @@ namespace common
   };
   
 }
-/* similar*/
-namespace common
-{
-  //判断是否具有一样的cv属性，不包括指针
-  template<class L,class R,bool v=(_reference_cast<L> ==_reference_cast<R>)>
-  struct is_similar
-    :bool_constant<(std::is_const<L>::value==std::is_const<R>::value)
-                  &&(std::is_volatile<L>::value==std::is_volatile<R>::value)
-                  &&v
-                  &&is_normal_v<L> ==is_normal_v<R>>
-  {};
-  
-  template<class L,class R>
-  INLINE constexpr bool is_similar_v=is_similar<L,R>::value;
-}
 /*sort*/
 namespace common
 {
@@ -1364,6 +1292,66 @@ namespace common
   using insertion_sort_t=typename insertion_sort<L,B>::type;
 }
 
+namespace common
+{
+  template<class TL>
+  using unique=copy_cvref_t<TL,_unique<remove_cvref_t<TL>>>;
+  
+  template<class TL>
+  using unique_t=typename unique<TL>::type;
+  
+  template<class T,size_t r>
+  using take=copy_cvref<T,typename _take<remove_cvref_t<T>,r>::type>;
+  
+  template<class T,size_t r>
+  using take_t=typename take<T,r>::type;
+  
+  template<class T,template<class,class...>class Traits,class...P>
+  using equal_range
+    =copy_cvref<T,typename _equal_range<remove_cvref_t<T>,Traits,P...>::type>;
+  
+  template<class T,template<class,class...>class Traits,class...P>
+  using equal_range_t=typename equal_range<T,Traits,P...>::type;
+  
+  template<class TL,ptrdiff_t Idx,class...Add>
+  using insert
+    =copy_cvref<TL,typename _insert<remove_cvref_t<TL>,Idx,Add...>::type>;
+  
+  template<class TL,ptrdiff_t Idx,class...Add>
+  using insert_t=typename insert<TL,Idx,Add...>::type;
+  
+  template<class TL,class...Add>
+  using prepend_t=typename insert<TL,0,Add...>::type;
+  
+  template<class TL,class...Add>
+  using append_t=typename insert<TL,extent_v<TL>,Add...>::type;
+  
+  template<class TL,class T>
+  using remove_t=copy_cvref_t<TL,_remove_t<remove_cvref_t<TL>,T>>;
+  
+  template<class TL,class T>
+  using remove=type_identity<remove_t<TL,T>>;
+  
+  template<class TL,ptrdiff_t Idx>
+  using erase_t=copy_cvref_t<TL,_erase_t<remove_cvref_t<TL>,Idx>>;
+  
+  template<class TL,ptrdiff_t Idx>
+  using erase=type_identity<erase_t<TL,Idx>>;
+  
+  template<class TL,template<class,class...>class Pred,class...Other>
+  using erase_if_t=copy_cvref_t<TL,_erase_if_t<remove_cvref_t<TL>,Pred,Other...>>;
+  
+  template<class TL,template<class,class...>class Pred,class...Other>
+  using erase_if=type_identity<erase_if_t<TL,Pred,Other...>>;
+  
+  template<class List,template<class,class...>class Traits,class...P>
+  INLINE constexpr auto count_if_v=equal_range<List,Traits,P...>::count;
+  
+  template<class List,class Type>
+  INLINE constexpr auto count_v=equal_range<List,is_same,Type>::count;
+  template<class TL>
+  INLINE constexpr bool is_unique_v=unique<TL>::value;
+}
 /*test*/
 namespace common
 {
