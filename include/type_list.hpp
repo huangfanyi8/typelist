@@ -1313,16 +1313,20 @@ namespace common
   };
   
 }
-/*template similar*/
+/* similar*/
 namespace common
 {
+  //判断是否具有一样的cv属性，不包括指针
   template<class L,class R,bool v=(_reference_cast<L> ==_reference_cast<R>)>
-  struct similar
+  struct is_similar
     :bool_constant<(std::is_const<L>::value==std::is_const<R>::value)
                   &&(std::is_volatile<L>::value==std::is_volatile<R>::value)
                   &&v
                   &&is_normal_v<L> ==is_normal_v<R>>
   {};
+  
+  template<class L,class R>
+  INLINE constexpr bool is_similar_v=is_similar<L,R>::value;
 }
 /*sort*/
 namespace common
