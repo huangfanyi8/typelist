@@ -1,11 +1,24 @@
-/*c++ 14 c++17 c++20实现的轻量级元编程库，
- * 包含对标准库的扩展以及type_list相关的多种算法
- * */
 
-#ifndef DONG_DONG_COMMON_HPP
-#define DONG_DONG_COMMON_HPP
+/*
+ * Type_traits
+ * c++2x std::type_identity
+ * map
+ * extended conditional
+ * c++2x std::remove_cvref
+ * copy
+ * extended std::is_same
+ * is_specialization
+ * c++17 logic_pred
+ * c++2x common_type
+ * c++2x common_reference
+ *
+ * constant operate
+ */
 
-#include<type_traits>
+#ifndef _META_HPP_
+#define _META_HPP_
+
+#include<utility>
 #include<cstddef>
 
 #define NON_STL_CXX_14 201402L
@@ -13,7 +26,7 @@
 #define NON_STL_CXX_20 202002L
 
 #define NON_STL_HAS_CXX(VERSION)\
-__cplusplus >= VERSION || (defined(_MSVC_LANG) && _MSVC_LANG >= VERSION)
+(defined(_MSVC_LANG) && _MSVC_LANG >= VERSION)|| (__cplusplus >= VERSION)
 
 #define NON_STL_14 NON_STL_HAS_CXX(NON_STL_CXX_14)
 #define NON_STL_17 NON_STL_HAS_CXX(NON_STL_CXX_17)
@@ -21,87 +34,32 @@ __cplusplus >= VERSION || (defined(_MSVC_LANG) && _MSVC_LANG >= VERSION)
 
 #if NON_STL_17
 #define INLINE inline
-#define PRIVATE_INLINE inline
-#define AUTO(...) auto
 #else
 #define INLINE
-#define PRIVATE_INLINE
-#define AUTO(...) traits_value_t<__VA_ARGS__>
 #endif
 
-#if NON_STL_20
-#define CONCEPT concept
-#define CONSTEVAL consteval
-#else
-#define CONCEPT INLINE constexpr bool
-#define CONSTEVAL constexpr
-#endif
-
-//Constant
+/*constant*/
 namespace common
 {
-  enum class Error
-  {S_error};
-  
-  enum ReferenceType
-  {
-    S_lvalue_reference,
-    S_rvalue_reference,
-    S_none
-  };
-  
-  template<class T>
-  INLINE constexpr
-  ReferenceType _reference_cast
-    =std::is_lvalue_reference<T>::value
-     ?S_lvalue_reference
-     :std::is_rvalue_reference<T>::value
-      ?S_rvalue_reference
-      :S_none;
-  
   class undefined{};
   
-  template<class...>class _aux
-  {};
-  
-  template<class  Type>
-  struct type_identity
-  {using type=Type;};
-  
-  template<class ValueType,ValueType...v>
-  struct constant_sequence
-  {
-    using value_type = ValueType;
-    using self=constant_sequence;
-    static constexpr size_t value = sizeof...(v);
-    static constexpr size_t sequence = true;
-  };
-  
-  template<class Value, Value v>
-  struct constant
-  {
-    using value_type = Value;
-    using self=constant;
-    static constexpr value_type value = v;
-    static constexpr size_t sequence = false;
-    constexpr value_type operator()() const { return value; }
-    constexpr  explicit operator value_type() const { return value; }
-  };
+  template<class...> struct _aux{};
   
   template<class Constant,ptrdiff_t Dis>
   struct _advance
   {};
   
   template<class Type,Type v,ptrdiff_t Dis>
-  struct _advance<constant<Type,v>,Dis>
-    :type_identity<constant<Type,v+static_cast<Type>(Dis)>>
-  {};
-  
+  struct _advance<std::integral_constant<Type,v>,Dis>
+  {
+    using type = std::integral_constant<Type,v+static_cast<Type>(Dis)>;
+  };
+
   template<class Constant>
   struct _next
     :_advance<Constant,1>
   {};
-  
+
   template<class Constant>
   struct _prev
     : _advance<Constant,-1>
@@ -117,37 +75,50 @@ namespace common
   using _prev_t=typename _prev<C>::type;
   
   template<ptrdiff_t v>
-  using range_constant=constant<ptrdiff_t ,v>;
+  using range_constant = std::integral_constant<ptrdiff_t ,v>;
   
   template<size_t v>
-  using index_constant=constant<size_t,v>;
-  
-  using error_constant=constant<Error,Error::S_error>;
+  using index_constant = std::integral_constant<size_t,v>;
   
   template<size_t...v>
-  using index_sequence=constant_sequence<size_t,v...>;
+  using index_sequence = std::integer_sequence<size_t,v...>;
   
   template<ptrdiff_t...v>
-  using range_sequence=constant_sequence<ptrdiff_t,v...>;
+  using range_sequence = std::integer_sequence<ptrdiff_t,v...>;
   
   template<bool...v>
-  using bool_sequence=constant_sequence<bool,v...>;
+  using bool_sequence = std::integer_sequence<bool,v...>;
   
   template<char...v>
-  using char_sequence=constant_sequence<char,v...>;
+  using char_sequence = std::integer_sequence<char,v...>;
   
   template<int...v>
-  using int_sequence=constant_sequence<int,v...>;
+  using int_sequence = std::integer_sequence<int,v...>;
   
   template<bool v>
-  using bool_constant=constant<bool,v>;
+  using bool_constant = std::integral_constant<bool,v>;
   
-  using true_type=bool_constant<true>;
-  using false_type=bool_constant<false>;
+  template<ptrdiff_t v>
+  using ssize_constant = std::integral_constant<ptrdiff_t ,v>;
+  
+  using error_constant= std::integral_constant<int,-1>;
 }
-//map_t , remove_cvref_t
+
+/*type_traits*/
 namespace common
 {
+  template<class Type>
+  struct type_identity
+  {
+    using type=Type;
+  };
+  
+  template<class T>
+  struct _type_identity
+  {
+    using _type = T;
+  };
+  
   template<class Type,template<class>class...Pred>
   struct map
     :type_identity<Type>
@@ -165,156 +136,27 @@ namespace common
     :map<typename HeadP<Type>::type,RestP...>
   {};
   
-  template<class T>
-  struct remove_cvref
-    :map<T,std::remove_reference,std::remove_cv>
+  //bool A B
+  //bool A bool B C
+  //bool A bool B bool C D
+  template<class Bool,class If,class Else,class ...>
+  struct conditional
   {};
   
-  template<class Type,template<class >class...Pred>
-  using map_t=typename map<Type,Pred...>::type;
-  
-  template<class Type>
-  using remove_cvref_t=typename remove_cvref<Type>::type;
-}
-//copy
-namespace common
-{
-  template<class Input, class Output,
-    bool Const = std::is_const<Input>::value,
-    bool Volatile = std::is_volatile<Input>::value>
-  struct copy_cv
-    :std::conditional_t<Const,
-      std::conditional_t<Volatile, std::add_cv<Output>, std::add_const<Output>>,
-      std::conditional_t<Volatile, std::add_volatile< Output>, type_identity<Output>>
-    >
+  template<class Bool,class A,class B>
+  struct conditional<Bool,A,B>
+    :std::conditional<bool(Bool::value),A,B>
   {};
   
-  template<class Input,class Output,
-    bool R=std::is_rvalue_reference_v<Input>,
-    bool L=std::is_lvalue_reference_v<Input>>
-  struct copy_ref
-    :std::conditional_t<R,std::add_rvalue_reference<Output>,
-      std::conditional_t<L,std::add_lvalue_reference<Output>,type_identity<Output>>
-    >
+  template<class Bool1,class If,class Bool2,class ElseIf1,class... Rest>
+  struct conditional<Bool1,If,Bool2,ElseIf1, Rest...>
+    :std::conditional<bool(Bool1::value),If,typename conditional<Bool2,ElseIf1,Rest...>::type>
   {};
-  
-  template<class Input,class Output>
-  struct copy_cvref
-    :copy_ref<Input,typename copy_cv<std::remove_reference_t<Input>,Output>::type>
-  {};
-  
-  template<class Input, class Output>
-  using copy_cv_t = typename copy_cv<Input, Output>::type;
-  
-  template<class Input, class Output>
-  using copy_ref_t = typename copy_ref<Input, Output>::type;
-  
-  template<class Input, class Output>
-  using copy_cvref_t=typename copy_cvref<Input,Output>::type;
-}
-//switch
-namespace common
-{
-  template<class Void,std::ptrdiff_t index,class...Types>
-  struct _switch
-  {
-  private:
-    static constexpr int S_index_v=index>=0?index:sizeof...(Types)+index;
-  private:
-    template<class,std::ptrdiff_t c,class...>
-    struct Impl
-      :type_identity<undefined>
-    {};
-    
-    template<class Head,class...Rest>
-    struct Impl<void,0,Head,Rest...>
-      :type_identity<Head>
-    {};
-    
-    template<std::ptrdiff_t c,class Head,class Second,class...Rest>
-    struct Impl<std::enable_if_t<(c>0)>,c,Head,Second,Rest...>
-      :Impl<void,c-1,Second,Rest...>
-    {};
-  public:
-    using type=typename Impl<void,S_index_v,Types...>::type;
-  };
-  template<int Idx,class...Types>
-  using switch_t=typename _switch<void,Idx,Types...>::type;
-}
-//traits
-namespace common
-{
-  template<class T>
-  PRIVATE_INLINE constexpr bool _is_template_v = false;
-  
-  template<template<class...> class T, class...Types>
-  PRIVATE_INLINE constexpr bool _is_template_v<T<Types...>> = true;
-  
-  template<template<class Value,Value...>class T, class Value, Value...v>
-  PRIVATE_INLINE constexpr bool _is_template_v<T<Value,v...>> = true;
-  
-  template<class Value, Value v>
-  PRIVATE_INLINE constexpr bool _is_template_v<constant<Value,v>> = false;
-  
-  template<class Value, Value v>
-  PRIVATE_INLINE constexpr bool _is_template_v<std::integral_constant<Value,v>> = false;
-  
-  template<class>
-  struct _meta_traits
-  {
-    static_assert(false,"T must be a variadic template");
-  };
-  
-  template<template<class ...> class Template, class...Types>
-  struct _meta_traits<Template<Types...>>
-  {
-    using type=Template<>;
-    static constexpr bool S_normal = true;
-    using value_type=undefined;
-    static constexpr size_t size= sizeof...(Types);
-  };
-  
-  template<template<class Value, Value...> class Template, class Value, Value...value>
-  struct _meta_traits<Template<Value, value...>>
-  {
-    using type=Template<Value>;
-    static constexpr bool S_normal = false;
-    using value_type=Value;
-    static constexpr size_t size= sizeof...(value);
-  };
-  
-  template<class T>
-  struct meta_traits
-    : _meta_traits<remove_cvref_t<T>>
-  {};
-  
-  template<class List>
-  using make_empty_t = typename meta_traits<remove_cvref_t<List>>::type;
-  
-  template<class List>
-  using make_empty = type_identity<make_empty_t<List>>;
-  
-  template<class List>
-  INLINE constexpr bool is_empty_v = !meta_traits<List>::size;
-  
-  template<class List>
-  INLINE constexpr bool is_normal_v = meta_traits<List>::S_normal;
-  
-  template<class Template>
-  using traits_value_t = typename meta_traits<Template>::value_type;
-  
-  template<class Template>
-  INLINE constexpr auto extent_v = meta_traits<Template>::size;
-  
-  template<class T>
-  INLINE constexpr bool is_template_v = _is_template_v<remove_cvref_t<T>>;
-}
-//Predicate
-namespace common
-{
-  template<class,class...>
+
+
+  template<class...>
   struct is_same
-    :true_type
+    :std::true_type
   {};
   
   template<class L,class R>
@@ -324,76 +166,268 @@ namespace common
   
   template<class A,class B,class...Rest>
   struct is_same<A,B,Rest...>
-    :bool_constant<is_same<A,Rest...>::value&&is_same<B,Rest...>::value>
+    :std::integral_constant<bool,is_same<A,Rest...>::value&&is_same<B,Rest...>::value>
   {};
   
-  //0:and 1:or 2:not
   template<int type,class...>
   struct _logic_pred
-    :std::conditional_t<type==1,false_type,true_type>
+    :std::conditional_t<bool(type==1),std::false_type,std::true_type>
+  {};
+  
+  template<int type,class T>
+  struct _logic_pred<type,T>
+    :std::conditional<bool(type!=2),T,bool_constant<!T::value>>::type
   {};
   
   template<int type,class H,class...R>
   struct _logic_pred<type,H,R...>
-    :switch_t<type,
-    std::conditional_t<H::value,_logic_pred<type,R...>,false_type>,
-    std::conditional_t<H::value,true_type,_logic_pred<type,R...>>,
-    std::conditional_t<H::value,false_type,_logic_pred<type,R...>>>
+    : conditional<bool_constant<(type==0)>,
+      typename conditional<H,_logic_pred<type,R...>,std::false_type>::type,
+      bool_constant<(type==1)>,
+      std::conditional_t<H::value,std::true_type,_logic_pred<type,R...>>,
+      std::conditional_t<H::value,std::false_type,_logic_pred<type,R...>>>::type
   {};
   
   template<template<class...>class Template,class...>
   struct is_specialization
-    :false_type
+    :std::false_type
   {};
   
   template<template<class...>class Template, class...Types>
   struct is_specialization<Template,Template<Types...>>
-    :true_type
+    :std::true_type
   {};
   
-  template<class List,ptrdiff_t Idx,ptrdiff_t Extent=ptrdiff_t(extent_v<List>)>
-  struct _out_of_range
-    :bool_constant<(Idx>=0)?(Idx>=Extent):(Idx<-Extent)>
+  template<class T>
+  struct is_bounded_array
+    : std::false_type
   {};
-
-  template<class H,class...R>
-  using conjunction=_logic_pred<0,H,R...>;
-  template<class H,class...R>
-  using disjunction=_logic_pred<1,H,R...>;
-  template<class H,class...R>
-  using negation=_logic_pred<2,H,R...>;
   
-  //判断是否具有一样的cv属性，不包括指针
-  template<class L,class R,bool v=(_reference_cast<L> ==_reference_cast<R>)>
-  using is_similar =bool_constant<(std::is_const<L>::value==std::is_const<R>::value)
-                                  &&(std::is_volatile<L>::value==std::is_volatile<R>::value)
-                                  &&v
-                                  &&is_normal_v<L> ==is_normal_v<R>>;
+  template<class T, std::size_t N>
+  struct is_bounded_array<T[N]>
+    : std::true_type
+  {};
   
-  template<class L,class R>
-  INLINE constexpr bool is_similar_v=is_similar<L,R>::value;
+  template<class From, class To ,class = void>
+  struct is_nothrow_convertible
+    : _logic_pred<0,std::is_void<From>, std::is_void<To>>
+  {};
   
-  template<class H,class...R>
-  INLINE constexpr bool conjunction_v = conjunction<H,R...>::value;
+  template<class From, class To>
+  struct is_nothrow_convertible<From, To,
+    std::void_t<decltype(static_cast<To(*)()>(nullptr))>>
+    : bool_constant<noexcept(std::declval<void(&)(To) noexcept>()(std::declval<From>()))>
+  {};
   
-  template<class H,class...R>
-  INLINE constexpr bool disjunction_v = disjunction<H,R...>::value;
+  template<class Type,template<class >class...Pred>
+  using map_t=typename map<Type,Pred...>::type;
   
-  template<class H,class...R>
-  INLINE constexpr bool negation_v= negation<H,R...>::value;
+  template<class T>
+  using remove_cvref = std::remove_cv<std::remove_reference_t<T>>;
   
-  template<template<class...>class Template, class...Types>
-  INLINE constexpr bool is_specialization_v = is_specialization<Template, Types...>::value;
+  template<class Type>
+  using remove_cvref_t = typename remove_cvref<Type>::type;
   
-  template<ptrdiff_t Idx,class T>
-  INLINE constexpr auto _conversion_v=Idx>=0?Idx:Idx+ptrdiff_t(extent_v<T>);
+  template<class Bool,class If,class Else,class ... Rest>
+  using conditional_t = typename conditional<Bool,If,Else,Rest...>::type;
   
-  template<class T,ptrdiff_t Idx>
-  INLINE constexpr bool _is_out_of_range=_out_of_range<T,Idx>::value;
+  template<class...R>
+  using conjunction = _logic_pred<0,R...>;
   
-  template<class H,class...Rest>
-  INLINE constexpr bool is_same_v=is_same<H,Rest...>::value;
+  template<class...R>
+  using disjunction = _logic_pred<1,R...>;
+  
+  template<class...R>
+  using negation = typename _logic_pred<2,R...>::type;
+  
+  template<class From,class To>
+  using copy_const_t = std::conditional_t<std::is_const<From>::value, std::add_const_t<To>, To>;
+  
+  template<class From,class To>
+  using copy_volatile_t = std::conditional_t<std::is_volatile<From>::value, std::add_volatile_t<To>, To>;
+  
+  template<class From,class To>
+  using copy_cv_t = copy_const_t<From, copy_volatile_t<From, To>>;
+  
+  
+  template<class From,class To>
+  using copy_reference_t = conditional_t<
+    std::is_rvalue_reference<From>, std::add_rvalue_reference_t<To>,
+    std::is_lvalue_reference<From>, std::add_lvalue_reference_t<To>,
+    To>;
+  
+  template<class From,class To>
+  using copy_cvref_t = copy_reference_t<From, copy_cv_t<From, To>>;
+  
+  template<class From,class To>
+  using copy_cvref = type_identity<copy_reference_t<From, copy_cv_t<From, To>>>;
+  
 }
+
+/*Template traits*/
+namespace common
+{
+  namespace _details
+  {
+    template<class T>
+    struct _is_template
+      :std::false_type
+    {};
+    
+    template<template<class...>class TL,class...T>
+    struct _is_template<TL<T...>>
+      :std::true_type
+    {};
+    
+    template<template<class VT,VT...>class TL,class VT,VT..._v>
+    struct _is_template<TL<VT,_v...>>
+      :std::true_type
+    {};
+    
+    template<class Value, Value v>
+    struct _is_template<std::integral_constant<Value,v>>
+      :std::false_type
+    {};
+    
+    template<class>
+    struct _meta_traits
+    {
+      static_assert(false,"T must be a variadic template");
+    };
+    
+    template<template<class ...> class Template, class...Types>
+    struct _meta_traits<Template<Types...>>
+    {
+      using type=Template<>;
+      static constexpr bool S_normal = true;
+      using value_type=undefined;
+      static constexpr size_t size= sizeof...(Types);
+    };
+    
+    template<template<class Value, Value...> class Template, class Value, Value...value>
+    struct _meta_traits<Template<Value, value...>>
+    {
+      using type=Template<Value>;
+      static constexpr bool S_normal = false;
+      using value_type=Value;
+      static constexpr size_t size= sizeof...(value);
+    };
+  }
+  
+  template<class T>
+  struct is_template
+    :_details::_is_template<remove_cvref_t<T>>
+  {};
+  
+  template<class T>
+  struct meta_traits
+    : _details::_meta_traits<remove_cvref_t<T>>
+  {};
+  
+  template<class List>
+  using make_empty_t = typename meta_traits<remove_cvref_t<List>>::type;
+  
+  template<class List>
+  using make_empty = type_identity<make_empty_t<List>>;
+  
+  template<class Template>
+  using traits_value_t = typename meta_traits<Template>::value_type;
+  
+  template<class TL>
+  using is_empty = bool_constant<meta_traits<TL>::size==0>;
+  
+  template<class TL>
+  using is_normal = bool_constant<meta_traits<TL>::S_normal>;
+  
+  template<class TL>
+  using extent = index_constant<meta_traits<TL>::size>;
+  
+  namespace _details
+  {
+    template<class List,ptrdiff_t Idx,ptrdiff_t Extent=ptrdiff_t(extent<List>::value)>
+    struct _out_of_range
+      :bool_constant<(Idx>=0)?(Idx>=Extent):(Idx<-Extent)>
+    {};
+    
+    template<ptrdiff_t Idx,class T>
+    struct _actual_index
+      :std::conditional_t<(Idx>=0),ssize_constant<Idx>,ssize_constant<Idx+ptrdiff_t(extent<T>::value)>>
+    {};
+  }
+}
+
+/*inline constant*/
+namespace common
+{
+  template<class List>
+  INLINE constexpr bool is_empty_v = !meta_traits<List>::size;
+  
+  template<class List>
+  INLINE constexpr bool is_normal_v = meta_traits<List>::S_normal;
+  
+  template<class Template>
+  INLINE constexpr auto extent_v = meta_traits<Template>::size;
+  
+  template<class T>
+  INLINE constexpr bool is_template_v = is_template<remove_cvref_t<T>>::value;
+  
+  template<typename T>
+  INLINE constexpr bool is_bounded_array_v = is_bounded_array<std::remove_reference_t<T>>::value;
+  
+  template<class...T>
+  INLINE constexpr bool is_same_v = is_same<T...>::value;
+}
+//merge
+namespace common
+{
+  template<class...Lists>
+  class _merge
+  {};
+  
+  template<class Head,class...Rest>
+  class _merge<Head,Rest...>
+  {
+    static_assert(conjunction<is_template<Head>,is_template<Rest>...>::value);
+  private:
+    template<class...>
+    struct _impl
+    {};
+    
+    template<template<class...>class Template,class...Types>
+    struct _impl<Template<Types...>>
+      :type_identity<Template<Types...>>
+    {};
+    
+    template<template<class Value,Value...>class Template,class Value,Value...value>
+    struct _impl<Template<Value,value...>>
+      :type_identity<Template<Value,value...>>
+    {};
+    
+    template<template<class...>class Template,class...P,class...O>
+    struct _impl<Template<P...>,Template<O...>>
+      :type_identity<Template<P...,O...>>
+    {};
+    
+    template<template<class Value,Value...>class Template,class Value,Value...P,Value...O>
+    struct _impl<Template<Value,P...>,Template<Value,O...>>
+      :type_identity<Template<Value,P...,O...>>
+    {};
+    
+    template<class T,class U,class...Other>
+    struct _impl<T,U,Other...>
+      :_impl<typename _impl<T,U>::type,Other...>
+    {};
+  public:
+    using type=typename _impl<Head,Rest...>::type;
+  };
+  
+  template<class...Lists>
+  using merge=_merge<remove_cvref_t<Lists>...>;
+  
+  template<class...Lists>
+  using merge_t=typename merge<Lists...>::type;
+}
+
 //cxx20 common_type
 namespace common
 {
@@ -420,9 +454,10 @@ namespace common
     {};
     
     template<class L,class R>
-    struct Impl_base<L,R,std::void_t<std::decay_t<decltype(false?std::declval<L>():std::declval<R>())>>>
-      :std::decay<decltype(false?std::declval<L>():std::declval<R>())>
-    {};
+    struct Impl_base<L,R,std::void_t<condition_type<L,R>>>
+    {
+      using type =condition_type<L,R>;
+    };
     
     template<class L,class R,class=void>
     struct Impl
@@ -445,261 +480,12 @@ namespace common
   template<class...Types>
   using common_type_t=typename common_type<Types...>::type;
 }
-//Common Reference
-namespace common
-{
-  //CPO class
-  template<class T,class U,
-    template<class> class TQ, template<class> class UQ>
-  struct basic_common_reference
-  { };
-  
-  template<class T>
-  INLINE constexpr bool S_exists_v=!std::is_same<remove_cvref<T>,undefined>::value;
-  
-  namespace common_reference_detail
-  {
-    template<class T>
-    INLINE constexpr bool S_exists_v=!std::is_same<remove_cvref<T>,undefined>::value;
-    
-    template<class T,ReferenceType v=_reference_cast<T>>
-    struct xref
-    {
-      template<class U>
-      using type=std::conditional_t<v==S_none,copy_cv_t<T,U>,
-        std::conditional_t<v==S_lvalue_reference,
-          copy_cv_t<T,U>&,
-          copy_cv_t<T,U>&&>>;
-    };
-    
-    template<typename Tp1, typename Tp2>
-    using basic_common_ref
-      = typename basic_common_reference<remove_cvref_t<Tp1>,
-      remove_cvref_t<Tp2>,
-      xref<Tp1>::template type,
-      xref<Tp2>::template type>::type;
-    
-    template<class X,class Y,class=void>
-    struct cond_res
-      :type_identity<undefined>
-    {};
-    
-    template<class X,class Y>
-    struct cond_res<X,Y,std::void_t<decltype(false ? std::declval<X(&)()>()() :std::declval<Y(&)()>()())>>
-      :type_identity<decltype(false ? std::declval<X(&)()>()() : std::declval<Y(&)()>()())>
-    {};
-    
-    template<class X,class Y>
-    using cond_res_t=typename cond_res<X,Y>::type;
-    
-    template<class X,class Y>
-    using cond_res_cvref_t
-      = cond_res_t<copy_cv_t<X,Y>&,copy_cv_t<Y,X>&>;
-    
-    template<class A,class B>
-    struct SimpleCommonReference
-    {
-    private:
-      template<class L,class R,
-        ReferenceType=_reference_cast<L>,
-        ReferenceType=_reference_cast<R>>
-      struct Impl
-        :type_identity<undefined>
-      {};
-      
-      template<class L,class R>
-      struct Impl<L,R,S_lvalue_reference,S_lvalue_reference>
-      {
-      private:
-        using X=map_t<L,std::remove_reference>;
-        using Y=map_t<R,std::remove_reference>;
-      private:
-        using _type=cond_res_cvref_t<X,Y>;
-      public:
-        constexpr static bool S_exist
-          =conjunction_v<std::is_reference<_type>,bool_constant<S_exists_v<_type>>>;
-        using type=std::conditional_t<S_exist,_type,undefined>;
-      };
-      
-      template<class L,class R>
-      struct Impl<L,R,S_rvalue_reference,S_rvalue_reference>
-      {
-      private:
-        using X=map_t<L,std::remove_reference>;
-        using Y=map_t<R,std::remove_reference>;
-      
-      private:
-        using _type=typename Impl<X&,Y&>::type;
-        using C=map_t<_type,std::remove_reference>;
-      public:
-        using type=std::conditional_t<
-          conjunction_v<std::is_convertible<L,C>,
-            std::is_convertible<R,C>>,C,undefined>;
-      };
-      
-      template<class L,class R>
-      struct  Impl<L,R,S_rvalue_reference,S_lvalue_reference>
-      {
-      private:
-        using X=map_t<L,std::remove_reference>;
-        using Y=map_t<R,std::remove_reference>;
-      
-      private:
-        using D = typename Impl<const X&, Y&>::type;
-      public:
-        using type=std::conditional_t<std::is_convertible<L,D>::value,D,undefined>;
-      };
-      
-      template<class L,class R>
-      struct  Impl<L,R,S_lvalue_reference,S_rvalue_reference>
-        :Impl<R,L,S_rvalue_reference,S_lvalue_reference>
-      {};
-    
-    public:
-      using type=typename Impl<A,B>::type;
-    };
-    
-    template<class...Types>
-    struct common_reference
-    {
-    private:
-      ///sizeof...(T)==0
-      template<class...>
-      struct Impl
-      {};
-      
-      template<class Type>
-      struct Impl<Type>
-        :type_identity<Type>
-      {};
-      
-      template<class A,class B>
-      struct Impl<A,B>
-      {
-      private:
-        template<class L,class R,int cond=1,class=void>
-        struct Two
-          :Two<L,R,cond+1>
-        {};
-        
-        template<class L,class R>
-        struct Two<L,R,1,std::enable_if_t<
-          conjunction_v<std::is_reference<L>,
-            std::is_reference<R>>>>
-        {
-        private:
-          using S=typename SimpleCommonReference<L,R>::type;
-        public:
-          using type=std::conditional_t<
-            conjunction_v<std::is_convertible<map_t<L,std::add_pointer>,
-              map_t<S,std::add_pointer>>,
-              std::is_convertible<map_t<L,std::add_pointer>,map_t<S,std::add_pointer>>>,
-            S,typename Two<L,R,2>::type>;
-          
-        };
-        
-        template<class L,class R>
-        struct Two<L,R,2,std::void_t<typename basic_common_reference<remove_cvref_t<L>,
-          remove_cvref_t<R>,
-          xref<L>::template type,
-          xref<R>::template type>::type>>
-          :basic_common_reference<remove_cvref_t<L>,
-            remove_cvref_t<R>,
-            xref<L>::template type,
-            xref<R>::template type>
-        {};
-        
-        template<class L,class R>
-        struct Two<L,R,3,std::void_t<cond_res_t<L,R>>>
-          :cond_res<L,R>
-        {};
-        
-        template<class L,class R>
-        struct Two<L,R,4,std::void_t<common_type_t<L,R>>>
-          :common_type<L,R>
-        {};
-        
-        template<class L,class R>
-        struct Two<L,R,5>
-        {};
-      public:
-        using type=typename Two<A,B>::type;
-      };
-      
-      template<class A,class B,class C,class...Rest>
-      struct Impl<A,B,C,Rest...>
-        :Impl<typename Impl<A,B>::type,C,Rest...>
-      {};
-    
-    public:
-      using type=typename Impl<Types...>::type;
-    };
-  }
-  
-  template<class...Types>
-  struct common_reference
-    :common::common_reference_detail::common_reference<Types...>
-  {};
-  
-  template<class...Types>
-  using common_reference_t=typename common_reference<Types...>::type;
-}
-//merge
-namespace common
-{
-  template<class...Lists>
-  class _merge
-  {};
-  
-  template<class Head,class...Rest>
-  class _merge<Head,Rest...>
-  {
-  private:
-    template<class...>
-    struct Impl
-      :type_identity<undefined>
-    {};
-    
-    template<template<class...>class Template,class...Types>
-    struct Impl<Template<Types...>>
-      :type_identity<Template<Types...>>
-    {};
-    
-    template<template<class Value,Value...>class Template,class Value,Value...value>
-    struct Impl<Template<Value,value...>>
-      :type_identity<Template<Value,value...>>
-    {};
-    
-    template<template<class...>class Template,class...P,class...O>
-    struct Impl<Template<P...>,Template<O...>>
-      :type_identity<Template<P...,O...>>
-    {};
-    
-    template<template<class Value,Value...>class Template,class Value,Value...P,Value...O>
-    struct Impl<Template<Value,P...>,Template<Value,O...>>
-      :type_identity<Template<Value,P...,O...>>
-    {};
-    
-    template<class T,class U,class...Other>
-    struct Impl<T,U,Other...>
-      :Impl<typename Impl<T,U>::type,Other...>
-    {};
-  public:
-    using type=typename Impl<Head,Rest...>::type;
-  };
-  
-  template<class...Lists>
-  using merge=_merge<remove_cvref_t<Lists>...>;
-  
-  template<class...Lists>
-  using merge_t=typename merge<Lists...>::type;
-}
+
 //filter
 namespace common
 {
   enum struct Category
   {
-    S_satisfied,
     S_unique,
     S_take,
     S_sub,
@@ -713,40 +499,17 @@ namespace common
     :type_identity<undefined>
   {};
   
-  template<class T,template<class,class...>class Traits>
-  struct _filter<Category::S_satisfied,T,Traits,std::enable_if_t<!is_template_v<T>>>
-    :false_type
-  {};
-  
-  template<class T,template<class,class>class Traits>
-  struct _filter<Category::S_satisfied,T,Traits,std::enable_if_t<(extent_v<T> <= 1)>>
-    :true_type
-  {};
-  
-  template<template<class...>class T,
-    template<class,class>class Traits,
-    class H,class S,class...R>
-  struct _filter<Category::S_satisfied,T<H,S,R...>,Traits,void>
-    :std::conditional_t<conjunction_v<Traits<H,S>,Traits<H,R>...>,
-    _filter<Category::S_satisfied,T<S,R...>,Traits,void>,false_type>
-  {};
-  
-  template<template<class,class>class BinaryPred,class...Types>
-  struct is_all
-    :_filter<Category::S_satisfied,_aux<Types...>,BinaryPred>
-  {};
-  
   struct _common_pred
   {
     template<ptrdiff_t Idx,template<class,class...>class,class,class...>
     struct _first_pos
-      :constant<ptrdiff_t,-1>
+      :ssize_constant<-1>
     {};
     
     template<ptrdiff_t Idx,template<class,class...>class T,template<class...>class L,class H,class...R,class...Other>
     struct _first_pos<Idx,T,L<H,R...>,Other...>
-      :std::conditional_t<T<H,Other...>::value,constant<ptrdiff_t,Idx>,
-        _first_pos<Idx+1,T,L<R...>,Other...>>
+      :std::conditional_t<T<H,Other...>::value,ssize_constant<Idx>,
+       _first_pos<Idx+1,T,L<R...>,Other...>>
     {};
     
     template<class T,class TL>
@@ -764,38 +527,39 @@ namespace common
     {};
     
     template<template<class V,V...>class Sequence,class V,V...v>
-    struct _traits<Sequence,V,_aux<constant<V,v>...>>
-      :type_identity<Sequence<V,v...>>
+    struct _traits<Sequence,V,_aux<std::integral_constant<V,v>...>>
+    :type_identity<Sequence<V,v...>>
     {};
     
     template<template<class V,V...>class S,class V,class TL>
     using _traits_t=typename _traits<S,V,TL>::type;
   };
 }
+
 //unique
 namespace common
 {
-  template<template<class...>class T,class H,class...R,class O,template<class,class>class Traits,class Bool>
-  struct _filter<Category::S_unique,T<H,R...>,Traits,O,Bool>
-    :std::conditional_t<Traits<H,O>::value,
-    _filter<Category::S_unique,T<R...>,Traits,O,false_type>,
-      _filter<Category::S_unique,T<R...>,Traits,merge_t<O,T<H>>,true_type>>
+  template<template<class...>class T,class H,class...R,class...O,template<class,class>class Traits,class Bool>
+  struct _filter<Category::S_unique,T<H,R...>,Traits,T<O...>,Bool>
+    :std::conditional_t<Traits<H,T<O...>>::value,
+      _filter<Category::S_unique,T<R...>,Traits,T<O...>,std::false_type>,
+      _filter<Category::S_unique,T<R...>,Traits,T<O...,H>,std::true_type>>
   {};
   
   template<class T,class O,template<class,class>class Traits,class Bool>
   struct _filter<Category::S_unique,T,Traits,O,Bool>
-    :Bool,type_identity<O>
+    :Bool,_type_identity<O>
   {};
   
-  template<class TL,class=std::enable_if_t<is_template_v<TL>>>
+  template<class TL,class=std::enable_if_t<is_template<TL>::value>>
   struct _unique
     :private _common_pred
   {
   private:
-    using _base=_filter<Category::S_unique,TL,_first,make_empty_t<TL>,true_type>;
+    using _base=_filter<Category::S_unique,TL,_first,make_empty_t<TL>,std::true_type>;
   public:
     static constexpr bool value=_base::value;
-    using type=typename _base::type;
+    using type=typename _base::_type;
   };
   
   template<template<class V,V...v>class TL,class V,V...v>
@@ -803,131 +567,96 @@ namespace common
     :private _common_pred
   {
   private:
-    using _sequence=_aux<constant<V,v>...>;
-    using _base=_filter<Category::S_unique,remove_cvref_t<_sequence>,_first,_aux<>,true_type>;
-    using _type=copy_cvref_t<_sequence,typename _base::type>;
+    using _sequence=_aux<std::integral_constant<V,v>...>;
+    using _base=_filter<Category::S_unique,remove_cvref_t<_sequence>,_first,_aux<>,std::true_type>;
+    using _type=copy_cvref_t<_sequence,typename _base::_type>;
   public:
     static constexpr bool value=_base::value;
     using type=_traits_t<TL,V,_type>;
   };
 }
-///reverse
+//reverse
 namespace common
 {
   template<class List,bool=is_template_v<List>>
-  class reverse
+  class _reverse
   {
   private:
     template<class T,class E>
-    struct Impl
+    struct _impl
       :type_identity<E>
     {};
     
-    template<template<class...> class Template,class E,class Head,class...Rest>
-    struct Impl<Template<Head,Rest...>,E>
-      :Impl<Template<Rest...>,merge_t<Template<Head>,E>>
+    template<template<class...> class Template,class...O,class Head,class...Rest>
+    struct _impl<Template<Head,Rest...>,Template<O...>>
+      :_impl<Template<Rest...>,Template<Head,O...>>
     {};
-    template<template<class Value,Value...> class Template,class Empty,class Value,Value Head,Value...Rest>
-    struct Impl<Template<Value,Head,Rest...>,Empty>
-      :Impl<Template<Value,Rest...>,merge_t<Template<Value,Head>,Empty>>
+    template<template<class Value,Value...> class Template,class Value,Value Head,Value...Rest,Value...O>
+    struct _impl<Template<Value,Head,Rest...>,Template<Value,O...>>
+      :_impl<Template<Value,Rest...>,Template<Value,Head,O...>>
     {};
   private:
-    using _type=typename Impl<remove_cvref_t<List>,make_empty_t<List>>::type;
+    using _type=typename _impl<remove_cvref_t<List>,make_empty_t<List>>::type;
   public:
     using type=copy_cvref_t<List,_type>;
   };
   
   template<class Template>
-  using reverse_t=typename reverse<Template>::type;
+  using reverse_t=typename _reverse<remove_cvref_t<Template>>::type;
+  
+  template<class Template>
+  using reverse = _reverse<remove_cvref_t<Template>>;
 }
 //get_n
 namespace common
 {
-  template<class T,/*TypeList*/
-    std::ptrdiff_t Idx,/*index sub*/
-    class ErrorType/*error type*/
-  >
-  #if NON_STL_20
-  requires (is_template_v<T>)
-  #endif
-  class _get_n
+  namespace _details
   {
-    static_assert(is_template_v<T>,"T must be a variadic template");
-    using ptrdiff_t=std::ptrdiff_t;
-    
-    static constexpr auto S_idx
-      =Idx>=0?Idx:ptrdiff_t(extent_v<T>)+Idx;
-    
-    template<ptrdiff_t c,class,class=void>
-    struct Impl
-      :type_identity<ErrorType>
+    template<class,ptrdiff_t _index,class E , class = void>
+    struct _get
+      :type_identity<E>
     {};
     
-    template<template<class...>class List,class Head,class...Rest>
-    struct Impl<0,List<Head,Rest...>>
-      :type_identity<Head>
+    template<template<class...>class TL,class A,class...Rest,class E>
+    struct _get<TL<A,Rest...>,0,E>
+      :type_identity<A>
     {};
     
-    template<template<class Value,Value...>class List,
-      class Value,
-      Value Head,Value...Rest>
-    struct Impl<0,List<Value,Head,Rest...>>
-      :type_identity<constant<Value,Head>>
+    template<template<class...>class TL,class A,class B,class...Rest,class E>
+    struct _get<TL<A,B,Rest...>,1,E>
+      :type_identity<B>
     {};
     
-    template<ptrdiff_t c,template<class...>class List,
-      class Head,class Second,class...Rest>
-    #if NON_STL_20
-    requires(c>0)
-    struct Impl<c,List<Head,Second,Rest...>>
-    #else
-    struct Impl<c,List<Head,Second,Rest...>,std::enable_if_t<(c>0)>>
-      #endif
-      :Impl<c-1,List<Second,Rest...>>
+    template<template<class...>class TL,class A,class B,class C,class...Rest,class E>
+    struct _get<TL<A,B,C,Rest...>,2,E>
+      :type_identity<C>
     {};
     
-    template<ptrdiff_t c,template<class Value,Value...>class List,
-      class Value,
-      Value Head,Value...Rest>
-    #if NON_STL_20
-    requires(c>0)
-    struct Impl<c,List<Value,Head,Rest...>>
-    #else
-    struct Impl<c,List<Value,Head,Rest...>,std::enable_if_t<(c>0)>>
-      #endif
-      :Impl<c-1,List<Value,Rest...>>
+    template<ptrdiff_t _index,template<class...>class TL,class A,class B,class C,class D,class...Rest,class E>
+    struct _get<TL<A,B,C,D,Rest...>,_index,E,std::enable_if_t<(_index>2)>>
+      :_get<TL<D,Rest...>,_index-3,E>
     {};
+    
+    template<template<class VT,VT...>class TL,class VT,VT..._v,ptrdiff_t _index,class E>
+    struct _get<TL<VT,_v...>,_index,E>
+      :_get<_aux<std::integral_constant<VT,_v>...>,_index,E>
+    {};
+  }
   
-  public:
-    using type=typename Impl<S_idx,T>::type;
-  };
+  template<class TL,ptrdiff_t _index,class E=undefined>
+  using get_n = _details::_get<TL,_details::_actual_index<_index,TL>::value,E>;
   
-  template<class T,/*TypeList*/
-    std::ptrdiff_t Idx,/*index sub*/
-    class ErrorType/*error type*/
-  >
-  class get_n
-    :public _get_n<remove_cvref_t<T>,Idx,ErrorType>
-  {};
-  
-  template<class T,/*TypeList*/
-    std::ptrdiff_t Idx,/*index sub*/
-    class ErrorType=undefined/*error type*/
-  >
-  using get_n_t=typename get_n<T,Idx,ErrorType>::type;
-  
-  template<class T,/*TypeList*/
-    std::ptrdiff_t Idx,/*index sub*/
-    class ErrorType=error_constant, /*error type*/
-    class=std::enable_if_t<!is_normal_v<T>>
-  >
-  INLINE constexpr auto get_n_v=get_n<T,Idx,ErrorType>::type::value;
+  template<class TL,ptrdiff_t _index,class E=undefined>
+  using get_n_t=typename get_n<TL,_index,E>::type;
   
   template<class Template>
   using front_t = get_n_t<Template,0>;
   
   template<class Template>
   using back_t = get_n_t<Template,-1>;
+  
+  template<class TL,ptrdiff_t _index,class E=error_constant>
+  INLINE constexpr auto get_n_v=get_n_t<TL,_index,E>::value;
   
   template<class Template,class ErrorType=error_constant>
   INLINE constexpr auto front_v=get_n_v<Template,0>;
@@ -942,8 +671,8 @@ namespace common
     template<class,class>class Traits,class Num,class Init,class O>
   struct _filter<Category::S_take,TL<H,R...>,Traits,Num,Init,O>
     :std::conditional_t<Traits<Num,Init>::value,
-    type_identity<O>,
-    _filter<Category::S_take,TL<R...>,Traits,Num,_next_t<Init>,merge_t<O,TL<H>>>>
+      type_identity<O>,
+      _filter<Category::S_take,TL<R...>,Traits,Num,_next_t<Init>,merge_t<O,TL<H>>>>
   {};
   
   template<class TL,template<class,class>class Traits,class Num,class Init,class O>
@@ -955,37 +684,12 @@ namespace common
   struct _take
     :_filter<Category::S_take,T,is_same,index_constant<r>,index_constant<0>,make_empty_t<T>>
   {};
-  
+
   template<template<class VT,VT...>class Sequence,class ValueType,ValueType...value,size_t Idx>
   struct _take<Sequence<ValueType,value...>,Idx>
     :_common_pred
   {
-    using type=_traits_t<Sequence,ValueType,typename _take<_aux<constant<ValueType,value>...>,Idx>::type>;
-  };
-}
-//splice
-namespace common
-{
-  struct in_place_t{explicit in_place_t()=default;};
-  template<size_t>struct in_place_index_t{explicit in_place_index_t()=default;};
-  template<class>struct in_place_type_t{explicit in_place_type_t()=default;};
-  
-  INLINE constexpr auto in_place=in_place_t{};
-  template<class T>INLINE constexpr auto in_place_type=in_place_type_t<T>{};
-  template<size_t Idx>INLINE constexpr auto in_place_index=in_place_index_t<Idx>{};
-  
-  template<class >
-  struct list
-  {};
-  
-  template<template<class VT,VT...>class Sequence,class ValueType,ValueType...value>
-  struct list<Sequence<ValueType,value...>>
-  {
-    constexpr auto splice(int,int)
-    {}
-    
-    constexpr auto splice(in_place_t,int)
-    {}
+    using type=_traits_t<Sequence,ValueType,typename _take<_aux<std::integral_constant<ValueType,value>...>,Idx>::type>;
   };
 }
 //equal_range
@@ -997,15 +701,15 @@ namespace common
   template<template<class...>class List,class Head,class...Rest,/*TypeList*/
     template<class,class...>class Pred,/*Pred*/
     class...Parameters,/*Other*/
-      class Sequence,/*equal_range*/
-      class Init,/*loop*/
-      class Count/*Count*/>
+    class Sequence,/*equal_range*/
+    class Init,/*loop*/
+    class Count/*Count*/>
   struct _filter<Category::S_equal_range,List<Head,Rest...>,Pred,Sequence,Init,Count,Parameters...>
     :std::conditional_t<Pred<Head,Parameters...>::value,
       _filter<Category::S_equal_range,
-      List<Rest...>,Pred,merge_t<Sequence,index_sequence<Init::value>>,_next_t<Init>,_next_t<Count>,Parameters...>,
+        List<Rest...>,Pred,merge_t<Sequence,index_sequence<Init::value>>,_next_t<Init>,_next_t<Count>,Parameters...>,
       _filter<Category::S_equal_range,
-      List<Rest...>,Pred,Sequence,_next_t<Init>,Count,Parameters...>
+        List<Rest...>,Pred,Sequence,_next_t<Init>,Count,Parameters...>
     >
   {};
   
@@ -1033,19 +737,20 @@ namespace common
   template<template<class V,V...>class T,class V,V...v,
     template<class,class...>class Traits,class...P>
   struct _equal_range<T<V,v...>,Traits,P...>
-    :_equal_range<_aux<constant<V,v>...>,Traits,P...>
-  {};
+    :_equal_range<_aux<std::integral_constant<V,v>...>,Traits,P...>
+{};
 }
+
 /* erase_if
  * insert_if
  * remove
- * */
+*/
 namespace common
 {
   //insert_if erase_if
   template<template<class...>class List,
     template<class,class...>class Pred,
-      class Bool,
+    class Bool,
     class Head,class...Rest,
     class...Para,
     class...Increments>
@@ -1072,7 +777,7 @@ namespace common
   //insert_if
   template<template<class...>class List,
     template<class,class...>class Pred,
-      class Bool,
+    class Bool,
     class...Add,class...Types,class...Other>
   struct _insert_or_erase_if<List<Types...>,Pred,List<Add...>,Bool,Other...>
     : _filter<Category::S_insert_if,List<Types...>,Pred,List<Add...>,Bool,Other...>
@@ -1081,14 +786,14 @@ namespace common
   //insert_if_c
   template<template<class V,V...>class List,
     template<class,class...>class Pred,
-      class Bool,
+    class Bool,
     class V,V...Add,V...v,class...Para>
   struct _insert_or_erase_if<List<V,v...>,Pred,List<V,Add...>,Bool,Para...>
     :_common_pred
   {
   private:
-    using _sequence=_aux<constant<V,v>...>;
-    using _add=_aux<constant<V,Add>...>;
+    using _sequence=_aux<std::integral_constant<V,v>...>;
+    using _add=_aux<std::integral_constant<V,Add>...>;
     using _base=typename _filter<Category::S_insert_if,_sequence,Pred,_add,Bool,Para...>::type;
   public:
     using type=_traits_t<List,V,_base>;
@@ -1096,20 +801,18 @@ namespace common
   
   template<class Template,template<class,class...>class Predicate,
     class AddList,class...Para>
-  using _insert_if_t=typename _insert_or_erase_if<Template,Predicate,AddList,true_type,Para...>::type;
+  using _insert_if_t=typename _insert_or_erase_if<Template,Predicate,AddList,std::true_type,Para...>::type;
   
   //erase_if_t base
   template<class Template,template<class,class...>class Pred,class...Other>
-  using  _erase_if_t=typename _insert_or_erase_if<Template,Pred,make_empty_t<Template>,false_type,Other...>::type;
+  using  _erase_if_t=typename _insert_or_erase_if<Template,Pred,make_empty_t<Template>,std::false_type,Other...>::type;
   
   //移除相同的元素
   template<class Template,class T>
   using _remove_t=_erase_if_t<Template,is_same,T>;
 }
-/* erase
- * insert
- *
- * */
+
+/* erase insert*/
 namespace common
 {
   //插入(Idx)
@@ -1151,15 +854,15 @@ namespace common
   private:
     using _self=Template<Types...>;
     using _add=Template<Add...>;
-    static constexpr auto S_out_of_range=_is_out_of_range<_self,Idx>;
-    static constexpr auto S_index_v=_conversion_v<Idx,_self>;
+    static constexpr auto S_out_of_range=_details::_out_of_range<_self,Idx>::value;
+    static constexpr auto S_index_v=_details::_actual_index<Idx,_self>::value;
     
     using _type=std::conditional_t<(S_index_v>=0),
       Template<Types...,Add...>,
       Template<Add...,Types...>>;
     
     using _base=_filter<Category::S_insert,_self,is_same,make_empty_t<_self>,_add,
-      constant<ptrdiff_t,0>,constant<ptrdiff_t,_conversion_v<Idx,_self>>,Bool>;
+      ssize_constant<0>,ssize_constant<_details::_actual_index<Idx,_self>::value>,Bool>;
   public:
     using type=std::conditional_t<S_out_of_range,_type,typename _base::type>;
   };
@@ -1169,8 +872,8 @@ namespace common
     :_common_pred
   {
   private:
-    using _sequence=_aux<constant<V,v>...>;
-    using _base=typename _erase_or_insert<_sequence,Idx,_aux<constant<V,add>...>,Bool>::type;
+    using _sequence=_aux<std::integral_constant<V,v>...>;
+    using _base=typename _erase_or_insert<_sequence,Idx,_aux<std::integral_constant<V,add>...>,Bool>::type;
   public:
     using type=_traits_t<Template,V,_base>;
   };
@@ -1183,7 +886,7 @@ namespace common
     :type_identity<undefined>
   {};
   
-    //erase
+  //erase
   template<class/*Type List*/,
     ptrdiff_t>
   struct _erase
@@ -1194,7 +897,7 @@ namespace common
     ptrdiff_t Idx/*insert pos*/,
     class...Add,class...Types>
   struct _insert<Template<Types...>,Idx,Add...>
-    :_erase_or_insert<Template<Types...>,Idx,Template<Add...>,true_type>
+    :_erase_or_insert<Template<Types...>,Idx,Template<Add...>,std::true_type>
   {};
   
   template<template<class V,V...>class TL/*Type List*/,
@@ -1205,8 +908,8 @@ namespace common
     :_common_pred
   {
   private:
-    using _sequence=_aux<constant<V,v>...>;
-    using _base=typename _insert<_sequence,Idx,constant<V,add>...>::type;
+    using _sequence=_aux<std::integral_constant<V,v>...>;
+    using _base=typename _insert<_sequence,Idx,std::integral_constant<V,add>...>::type;
   public:
     using type=_traits_t<TL,V,_base>;
   };
@@ -1219,7 +922,7 @@ namespace common
   template<template<class...>class Template/*Type List*/,
     ptrdiff_t Idx/*insert pos*/,class...Types>
   struct _erase<Template<Types...>,Idx>
-    :_erase_or_insert<Template<Types...>,Idx,Template<>,false_type>
+    :_erase_or_insert<Template<Types...>,Idx,Template<>,std::false_type>
   {};
   
   template<template<class V,V...>class TL/*Type List*/,
@@ -1229,7 +932,7 @@ namespace common
     :_common_pred
   {
   private:
-    using _sequence=_aux<constant<V,v>...>;
+    using _sequence=_aux<std::integral_constant<V,v>...>;
     using _base=typename _erase<_sequence,Idx>::type;
   public:
     using type=_traits_t<TL,V,_base>;
@@ -1246,9 +949,7 @@ namespace common
   struct _rotate
   {
   private:
-    static constexpr auto S_index_v=extent_v<TL>!=0
-      ?I%ptrdiff_t(extent_v<TL>)
-      :0;
+    static constexpr auto S_index_v=extent<TL>::value!=0?I%ptrdiff_t(extent<TL>::value):0;
     
     template<class L,ptrdiff_t Index,bool v=S_index_v>=0>
     struct Impl
@@ -1258,8 +959,8 @@ namespace common
     template<template<class...>class L,class H,class...R,ptrdiff_t Index>
     struct Impl<L<H,R...>,Index,false>
       :std::conditional_t<Index==S_index_v,
-      type_identity<L<H,R...>>,
-      Impl<L<R...,H>,Index-1>>
+        type_identity<L<H,R...>>,
+        Impl<L<R...,H>,Index-1>>
     {};
     
     template<class,class...>struct prepend{};
@@ -1278,7 +979,7 @@ namespace common
         type_identity<L<H,R...>>,
         Impl<prepend_t<_erase_t<L<H,R...>,-1>,get_n_t<L<H,R...>,-1>>,Index+1>>
     {};
-    
+  
   public:
     using type=typename Impl<TL,0>::type;
   };
@@ -1286,13 +987,9 @@ namespace common
 /*sort*/
 namespace common
 {
-  template<template<class,class>class Traits,class L,class R>
-  using _equal_pred=bool_constant<!Traits<L,R>::value&&!Traits<R,L>::value>;
   
   template<template<class,class>class Traits,class L,class R>
-  INLINE constexpr auto _three_way_comparison_v=Traits<L,R>::value||_equal_pred<Traits,L,R>::value
-  ?true
-  :false;
+  using _equal_pred=bool_constant<!Traits<L,R>::value&&!Traits<R,L>::value>;
   
   template<class TL,template<class...>class BinaryPred>
   struct _insertion_sort
@@ -1307,7 +1004,7 @@ namespace common
   {
   private:
     template<class L,class R>
-    static constexpr auto S_comparison_v=_three_way_comparison_v<B,L,R>;
+    static constexpr auto S_comparison_v=B<L,R>::value||_equal_pred<B,L,R>::value;
     
     template<class L,template<class,class...>class Traits,class...Other>
     static constexpr auto _first_pos_v=_first_pos<0,Traits,L,Other...>::value;
@@ -1333,12 +1030,12 @@ namespace common
   
   template<template<class V,V...>class TL,
     template<class,class>class B,
-      class V,V...v>
+    class V,V...v>
   struct _insertion_sort<TL<V,v...>,B>
     :_common_pred
   {
   private:
-    using _sequence=_aux<constant<V,v>...>;
+    using _sequence=_aux<std::integral_constant<V,v>...>;
   public:
     using type=_traits_t<TL,V,typename _insertion_sort<_sequence,B>::type>;
   };
@@ -1354,17 +1051,241 @@ namespace common
   {};
   
   template<class V,V L,V R>
-  struct _less<constant<V,L>,constant<V,R>>
-    :bool_constant<L<R>
+  struct _less<std::integral_constant<V,L>,std::integral_constant<V,R>>
+  :bool_constant<L<R>
   {};
-  
+
   template<class V,V L,V R>
-  struct _greater<constant<V,L>,constant<V,R>>
-    :bool_constant<(L>R)>
+  struct _greater<std::integral_constant<V,L>,std::integral_constant<V,R>>
+  :bool_constant<(L>R)>
   {};
 
   template<class L,template<class,class>class B>
   using _insertion_sort_t=typename _insertion_sort<L,B>::type;
+  
+  namespace _details
+  {
+    template<class VT,class T>
+    struct _make_sequence
+    {
+      using type = std::integer_sequence<VT>;
+    };
+    
+    template<class VT,VT..._v>
+    struct _make_sequence<VT,_aux<std::integral_constant<VT,_v>...>>
+    {
+      using type = std::integer_sequence<VT,_v...>;
+    };
+    
+    template<class VT,class T>
+    using _make_sequence_t = typename _make_sequence<VT,T>::type;
+  }
+  
+  namespace _merge_sort
+  {
+    template<template<class,class>class Binary,class>
+    struct _min_sort;
+    
+    template<template<class,class>class Binary,class A,class B>
+    struct _min_sort<Binary,_aux<A,B>>
+      :std::conditional_t<Binary<A,B>::value,type_identity<_aux<A,B>>,type_identity<_aux<B,A>>>
+    {};
+    
+    template<template<class,class>class Binary,class T>
+    using _min_sort_t = typename _min_sort<Binary,T>::type;
+    
+    template<template<class,class>class Binary,
+      class  S1,class S2,class O>
+    struct _merge_two_sequence
+      :std::conditional_t<bool(extent<S1>::value>0),
+      merge<O,S1>,
+      merge<O,S2>>
+    {};
+    
+    template<template<class,class>class Binary,
+      template<class...>class TL,
+      class H1,class H2,class...A,class...B,class...C>
+    struct _merge_two_sequence<Binary,TL<H1,A...>,TL<H2,B...>,TL<C...>>
+      :std::conditional_t<Binary<H1,H2>::value,
+      _merge_two_sequence<Binary,TL<A...>,TL<H2,B...>,TL<C...,H1>>,
+        _merge_two_sequence<Binary,TL<H1,A...>,TL<B...>,TL<C...,H2>>>
+    {};
+    
+    template<template<class,class>class Binary,
+      template<class VT,VT...>class TL,
+      class VT,VT H1,VT H2,
+      VT...A,VT...B,VT...C>
+    struct _merge_two_sequence<Binary,TL<VT,H1,A...>,TL<VT,H2,B...>,TL<VT,C...>>
+      :std::conditional_t<Binary<std::integral_constant<VT,H1>,std::integral_constant<VT,H2>>::value,
+        _merge_two_sequence<Binary,TL<VT,A...>,TL<VT,H2,B...>,TL<VT,C...,H1>>,
+        _merge_two_sequence<Binary,TL<VT,H1,A...>,TL<VT,B...>,TL<VT,C...,H2>>>
+    {};
+    
+    template<template<class,class>class Binary,class S1,class S2>
+    using _merge_two_sequence_t = typename _merge_sort::_merge_two_sequence<Binary,S1,S2,make_empty_t<S1>>::type;
+    
+    template<class TL,class...Add>
+    using _append=_insert<TL,extent_v<TL>,Add...>;
+    
+    template<template<class,class>class,class T>
+    struct _split
+    {
+      using type = T;
+    };
+    
+    template<template<class,class>class Binary,class T>
+    struct _split<Binary,_aux<T>>
+      :type_identity<_aux<_aux<T>>>
+    {};
+    
+    template<template<class,class>class Binary,class T>
+    using  _split_t = typename _split<Binary,T>::type;
+    
+    template<template<class,class>class Binary,class A,class B>
+    struct _split<Binary,_aux<A,B>>
+    {
+      using type = _aux<_min_sort_t<Binary,_aux<A,B>>>;
+    };
+    
+    template<template<class,class>class Binary,class A,class B,class C>
+    struct _split<Binary,_aux<A,B,C>>
+    {
+      //_aux<_aux<A,B>,_aux<C>>
+      using type = typename _append<_split_t<Binary,_aux<A,B>>,_aux<C>>::type;
+    };
+    
+    template<template<class,class>class Binary,class A,class B,class C,class D>
+    struct _split<Binary,_aux<A,B,C,D>>
+    {
+      using type = typename _append<_split_t<Binary,_aux<A,B>>,_min_sort_t<Binary,_aux<C,D>>>::type;
+    };
+    
+    template<template<class,class>class Binary,class A,class B,class C,class D,class E,class...R>
+    struct _split<Binary,_aux<A,B,C,D,E,R...>>
+      :common::merge<_split_t<Binary,_aux<A,B,C,D>>,_split_t<Binary,_aux<E,R...>>>
+    {};
+    
+    template<class T>
+    struct _is_aux
+      :std::false_type
+    {};
+    
+    template<class ...T>
+    struct _is_aux<_aux<T...>>
+      :std::true_type
+    {};
+    
+    template<template<class ,class>class B,template<class VT,VT..._v>class TL,class VT,VT..._v>
+    struct _split<B,TL<VT,_v...>>
+    {
+    private:
+      using _base= typename _split<B,_aux<std::integral_constant<VT,_v>...>>::type;
+      
+      template<class>
+      struct _traits
+      {};
+      
+      template<class...D>
+      struct _traits<_aux<D...>>
+      {
+        using type = _aux<_details::_make_sequence_t<VT,D>...>;
+      };
+      
+      template<>
+      struct _traits<_aux<>>
+        :type_identity<_aux<std::integer_sequence<VT>>>
+      {};
+      
+      template<class T>
+      using _traits_t = typename _traits<T>::type;
+      
+    public:
+      using type = _traits_t<_base>;
+    };
+    
+    template<template<class,class>class B,class T>
+    struct _merge
+      :type_identity<T>
+    {};
+    
+    template<template<class,class>class B,class T>
+    using _merge_t = typename _merge<B,T>::type;
+    
+    template<template<class,class>class T,class A>
+    struct _merge<T,_aux<A>>
+    {
+      using type = A;
+    };
+    
+    template<template<class,class>class T,class A,class B>
+    struct _merge<T,_aux<A,B>>
+    {
+      using type = _merge_two_sequence_t<T,A,B>;
+    };
+    
+    template<template<class,class>class T,class A,class B,class C>
+    struct _merge<T,_aux<A,B,C>>
+    {
+      using type = _merge_two_sequence_t<T,_merge_two_sequence_t<T,A,B>,C>;
+    };
+    
+    template<template<class,class>class T,class A,class B,class C,class D>
+    struct _merge<T,_aux<A,B,C,D>>
+    {
+      using type = _merge_two_sequence_t<T,_merge_two_sequence_t<T,A,B>,_merge_two_sequence_t<T,C,D>>;
+    };
+    
+    template<template<class,class>class T,class A,class B,class C,class D,class E,class...R>
+    struct _merge<T,_aux<A,B,C,D,E,R...>>
+    {
+      using type = _merge_two_sequence_t<T,_merge_t<T,_aux<A,B,C,D>>,_merge_t<T,_aux<E,R...>>>;
+    };
+    
+    template<template<class,class>class B,class T>
+    struct _merge_sort
+    {};
+    
+    template<template<class,class>class B,template<class VT,VT...>class TL,class VT,VT..._v>
+    struct _merge_sort<B,TL<VT,_v...>>
+      :_merge<B,_split_t<B,TL<VT,_v...>>>
+    {};
+    
+    template<template<class,class>class B,class T>
+    using _merge_sort_t = typename _merge_sort<B,T>::type;
+  }
+  
+  template<size_t _num,size_t _left,size_t _right,size_t _parent,class W>
+  struct _huffman_node
+  {};
+
+  template<class,size_t,size_t>
+  struct _change_node
+  {
+  
+  };
+  
+  
+  template<class T>
+  struct _make_huffman_tree
+  {};
+  
+  template<class T,T..._v>
+  struct _make_huffman_tree<std::integer_sequence<T,_v...>>
+  {
+    using _num_list = std::make_index_sequence<sizeof...(_v)>;
+    
+    template<class,class>
+    struct _make_node_list{};
+    
+    template<size_t..._index,T..._value>
+    struct _make_node_list<std::index_sequence<_index...>,std::integer_sequence<T,_value...>>
+    {
+      using type = _aux<_huffman_node<_index,0,0,0,std::integral_constant<T,_value>>...>;
+    };
+    
+    using _node_list = typename _make_node_list<_num_list,std::integer_sequence<T,_v...>>::type;
+  };
+
 }
 
 namespace common
@@ -1431,35 +1352,49 @@ namespace common
   template<class L,template<class,class>class B>
   using insertion_sort=copy_cvref<L,_insertion_sort_t<L,B>>;
   
+  template<template<class,class>class B,class T>
+  using merge_sort_t = typename _merge_sort::_merge_sort<B,T>::type;
+  
   template<class List,template<class,class...>class Traits,class...P>
-  INLINE constexpr auto count_if_v=equal_range<List,Traits,P...>::count;
+  using count_if = ssize_constant<_equal_range<remove_cvref_t<List>,Traits,P...>::count>;
   
   template<class List,class Type>
-  INLINE constexpr auto count_v=equal_range<List,is_same,Type>::count;
+  using count = count_if<List,is_same,Type>;
+  
+  template<class List,template<class,class...>class Traits,class...P>
+  INLINE constexpr size_t count_if_v=_equal_range<remove_cvref_t<List>,Traits,P...>::count;
+  
+  template<class List,class Type>
+  INLINE constexpr size_t count_v=_equal_range<remove_cvref_t<List>,is_same,Type>::count;
+  
   template<class TL>
   INLINE constexpr bool is_unique_v=unique<TL>::value;
 }
+
+namespace common
+{
+  namespace ext
+  {
+
+  }
+}
+
 /*test*/
 namespace common
 {
-  #if NON_STL_17
-  #include<variant>
-  using std::variant;
-  #else
+  #if 0
   template<class...>class variant{};
-  #endif
-  #include<tuple>
-  using std::tuple;
+  template<class...>class tuple{};
+  
   template<class...>class TypeList{};
   
-  #if 0
   static_assert(is_same_v<typename _rotate<_aux<int,double>,2>::type,
-    _aux<int,double>>);
+                _aux<int,double>>);
   static_assert(is_same_v<typename _rotate<_aux<int,double,char>,-2>::type,
-    _erase_t<_aux<double,char,int,double>,0>>);
+                _erase_t<_aux<double,char,int,double>,0>>);
   
   static_assert(is_same_v<typename _rotate<_aux<int,double,char>,-4>::type,
-    _aux<double,char,int>>);
+                _aux<double,char,int>>);
   
   static_assert(is_same_v<_erase_t<_aux<int>,0>,_aux<>>);
   static_assert(is_same_v<_erase_t<_aux<int,double,char,int,float,int,double>,1>,_aux<int,char,int,float,int,double>>);
@@ -1485,9 +1420,9 @@ namespace common
   
   static_assert(get_n_v<char_sequence<'1','2','3'>,0> =='1');
   static_assert(get_n_v<char_sequence<'1','2','3'>,1> =='2');
-  static_assert(get_n_v<char_sequence<'1','2','3'>,4> ==Error::S_error);
-  static_assert(get_n_v<char_sequence<'1','2','3'>,3> ==Error::S_error);
-  static_assert(get_n_v<char_sequence<>,-11> ==Error::S_error);
+  static_assert(get_n_v<char_sequence<'1','2','3'>,4> ==-1);
+  static_assert(get_n_v<char_sequence<'1','2','3'>,3> ==-1);
+  static_assert(get_n_v<char_sequence<>,-11> ==-1);
   static_assert(get_n_v<char_sequence<'1','2','3'>,2> =='3');
   static_assert(get_n_v<char_sequence<'1','2','3'>,-2> =='2');
   
@@ -1496,7 +1431,7 @@ namespace common
   static_assert(get_n_v<range_sequence<-3,-2,-1,0,1,2,3,4>,2> == -1);
   static_assert(get_n_v<range_sequence<-3,-2,-1,0>,-4> ==-3);
   static_assert(get_n_v<range_sequence<-3,-2,-1,0>,-1> ==0);
-  static_assert(get_n_v<std::index_sequence<1,2,3,4,5>,4> ==5);
+  static_assert(get_n_v<index_sequence<1,2,3,4,5>,4> ==5);
   static_assert(is_same_v<remove_cvref_t<tuple<int&>>,tuple<int&>>);
   
   static_assert(is_same_v<merge_t<int_sequence<1,4>,int_sequence<55>>,int_sequence<1,4,55>>);
@@ -1521,13 +1456,13 @@ namespace common
   static_assert(!is_unique_v<int_sequence<1,2,3,4,0,0>>);
   
   static_assert(is_same_v<int_sequence<1,2,3,4,5>,
-    reverse_t<int_sequence<5,4,3,2,1>>>);
+                reverse_t<int_sequence<5,4,3,2,1>>>);
   
   static_assert(is_same_v<int_sequence<1>,
-    reverse_t<int_sequence<1>>>);
+                reverse_t<int_sequence<1>>>);
   
-  static_assert(::std::is_same_v<reverse_t<std::variant<>&>,std::variant<>&>);
-  static_assert(::std::is_same_v<reverse_t<const std::variant<int,char*>>,const std::variant<char*,int>>);
+  static_assert(::std::is_same_v<reverse_t<variant<>>,variant<>>);
+  static_assert(::std::is_same_v<reverse_t<const variant<int,char*>>,variant<char*,int>>);
   
   static_assert(is_same_v<variant<int,double>,append_t<variant<int>,double>>);
   static_assert(is_same_v<variant<double>,append_t<variant<>,double>>);
@@ -1562,33 +1497,33 @@ namespace common
   static_assert(is_same_v<prepend_t<variant<int>,double>,variant<double,int>>);
   
   static_assert(is_same_v<variant<int,double,double>,
-    insert_t<variant<int,double>,-1,double>>);
+                insert_t<variant<int,double>,-1,double>>);
   
   static_assert(is_same_v<insert_t<variant<int,double,char>,1,void>,
-    variant<int,void,double,char>
-  >);
+                variant<int,void,double,char>
+                >);
   static_assert(is_same_v<insert_t<variant<int,double,char>,0,void>,
-    variant<void,int,double,char>
-  >);
+                variant<void,int,double,char>
+                >);
   static_assert(is_same_v<insert_t<variant<int,double,char>,2,void>,
-    variant<int,double,void,char>
-  >);
+                variant<int,double,void,char>
+                >);
   
   static_assert(is_same_v<insert_t<variant<int,double,char>,3,void>,
-    variant<int,double,char,void>
-  >);
+                variant<int,double,char,void>
+                >);
   
   static_assert(is_same_v<insert_t<variant<int,double,char>,111,void>,
-    variant<int,double,char,void>
-  >);
+                variant<int,double,char,void>
+                >);
   
   static_assert(is_same_v<insert_t<variant<>,5555,void,int>,
-    variant<void,int>
-  >);
+                variant<void,int>
+                >);
   
   static_assert(is_same_v<insert_t<variant<double*>,5555,void,int>,
-    variant<double*,void,int>
-  >);
+                variant<double*,void,int>
+                >);
   
   static_assert(is_same_v<prepend_t<variant<int>,double>,variant<double,int>>);
   
@@ -1600,31 +1535,31 @@ namespace common
   static_assert(is_same_v<insert_t<variant<int,char>,-2,char*>,variant<char*,int,char>>);
   
   static_assert(is_same_v<insert_t<index_sequence<1,2,3,4,5>,0,index_sequence<>>,
-    index_sequence<1,2,3,4,5>>);
+                index_sequence<1,2,3,4,5>>);
   
   static_assert(is_same_v<
-    insert_t<index_sequence<>,0,index_sequence<1,2,3,4,5>>,
-    index_sequence<1,2,3,4,5>,
-    insert_t<index_sequence<1,3,4,5>,1,index_sequence<2>>,
-    insert_t<index_sequence<1,2,4,5>,2,index_sequence<3>>,
-    insert_t<index_sequence<1,2,3,5>,3,index_sequence<4>>,
-    insert_t<index_sequence<1,2,3,4>,4,index_sequence<5>>,
-    insert_t<index_sequence<1,2,3,4>,5,index_sequence<5>>
-  >);
+                insert_t<index_sequence<>,0,index_sequence<1,2,3,4,5>>,
+                index_sequence<1,2,3,4,5>,
+                insert_t<index_sequence<1,3,4,5>,1,index_sequence<2>>,
+                insert_t<index_sequence<1,2,4,5>,2,index_sequence<3>>,
+                insert_t<index_sequence<1,2,3,5>,3,index_sequence<4>>,
+                insert_t<index_sequence<1,2,3,4>,4,index_sequence<5>>,
+                insert_t<index_sequence<1,2,3,4>,5,index_sequence<5>>
+                >);
   
   static_assert(is_same_v<
-    insert_t<index_sequence<>,-1,index_sequence<2>>,
-    insert_t<index_sequence<>,-2,index_sequence<2>>,
-    index_sequence<2>
-  >);
+                insert_t<index_sequence<>,-1,index_sequence<2>>,
+                insert_t<index_sequence<>,-2,index_sequence<2>>,
+                index_sequence<2>
+                >);
   
   static_assert(is_same_v<
-    insert_t<index_sequence<1>,-1,index_sequence<2>>,
-    insert_t<index_sequence<1>,-2,index_sequence<2>>,
-    index_sequence<2,1>
-  >);
+                insert_t<index_sequence<1>,-1,index_sequence<2>>,
+                insert_t<index_sequence<1>,-2,index_sequence<2>>,
+                index_sequence<2,1>
+                >);
   static_assert(common::is_same_v<_erase_t<index_sequence<1,2,3,4,5,6,7,8>,1000>,
-                _erase_t<index_sequence<1,2,3,4,5,6,7,8>,8>,index_sequence<1,2,3,4,5,6,7,8>>);
+    _erase_t<index_sequence<1,2,3,4,5,6,7,8>,8>,index_sequence<1,2,3,4,5,6,7,8>>);
   static_assert(::std::is_same_v<_erase_t<index_sequence<1,2,3,4,5,6,7,8>,1>,index_sequence<1,3,4,5,6,7,8>>);
   static_assert(::std::is_same_v<_erase_t<index_sequence<1,2,3,4,5,6,7,8>,0>,index_sequence<2,3,4,5,6,7,8>>);
   static_assert(::std::is_same_v<_erase_t<index_sequence<1,2,3,4,5,6,7,8>,1>,index_sequence<1,3,4,5,6,7,8>>);
@@ -1646,51 +1581,56 @@ namespace common
   static_assert(is_same_v<index_sequence<2,3,4,3,5,6,7>,_remove_t<index_sequence<1,2,1,3,4,3,5,6,7>,index_constant<1>>>);
   static_assert(count_v<_aux<int,double,char,float,int>,int> ==2);
   
-  template<class A,class B>using _less=bool_constant<(A::value<B::value)>;
   static_assert(count_v<index_sequence<8,1,1,1,2,3,4,1>,index_constant<1>> ==4);
-  static_assert(count_if_v<index_sequence<1,2,3,4,5,6,7>,_less,constant<size_t,3>> ==2);
-    static_assert(is_same_v<take_t<_aux<int,double,char>,1>,_aux<int>>);
+  static_assert(count_if_v<index_sequence<1,2,3,4,5,6,7>,_less,index_constant<3>> ==2);
+  static_assert(is_same_v<take_t<_aux<int,double,char>,1>,_aux<int>>);
   static_assert(is_same_v<take_t<_aux<int,double,char>,77>,_aux<int,double,char>>);
   static_assert(is_same_v<take_t<index_sequence<>,77>,index_sequence<>>);
   static_assert(is_same_v<take_t<index_sequence<111>,0>,index_sequence<>>);
   static_assert(is_same_v<take_t<index_sequence<1,11,77>,2>,index_sequence<1,11>>);
   
   static_assert(is_same_v<_aux<>,
-    _insertion_sort_t<_aux<>,_less>>);
+                _insertion_sort_t<_aux<>,_less>>);
   
   static_assert(is_same_v<_aux<char>,
-    _insertion_sort_t<_aux<char>,_less>>);
+                _insertion_sort_t<_aux<char>,_less>>);
   
   static_assert(is_same_v<_aux<char,int,double>,
-    _insertion_sort_t<_aux<int,double,char>,_less>>);
+                _insertion_sort_t<_aux<int,double,char>,_less>>);
   
   static_assert(is_same_v<_aux<char,int,float,double>,
-    _insertion_sort_t<_aux<int,double,char,float>,_less>>);
+                _insertion_sort_t<_aux<int,double,char,float>,_less>>);
   
   static_assert(is_same_v<_aux<>,
-    _insertion_sort_t<_aux<>,_greater>>);
+                _insertion_sort_t<_aux<>,_greater>>);
   
   static_assert(is_same_v<_aux<char>,
-    _insertion_sort_t<_aux<char>,_greater>>);
+                _insertion_sort_t<_aux<char>,_greater>>);
   
   static_assert(is_same_v<_aux<double,int,char>,
-    _insertion_sort_t<_aux<int,double,char>,_greater>>);
+                _insertion_sort_t<_aux<int,double,char>,_greater>>);
   
   static_assert(is_same_v<_aux<double,int,float,char>,
-    _insertion_sort_t<_aux<int,double,char,float>,_greater>>);
+                _insertion_sort_t<_aux<int,double,char,float>,_greater>>);
   
   static_assert(is_same_v<index_sequence<1>,_insertion_sort_t<index_sequence<1>,_less>>);
   static_assert(is_same_v<index_sequence<>,_insertion_sort_t<index_sequence<>,_less>>);
   
   static_assert(is_same_v<index_sequence<1,2,3,4,5,6,7,8,9>,
-    _insertion_sort_t<index_sequence<9,8,6,7,5,4,2,3,1>,_less>>);
+                _insertion_sort_t<index_sequence<9,8,6,7,5,4,2,3,1>,_less>>);
   
   static_assert(is_same_v<reverse_t<index_sequence<1,2,3,4,5,6,7,8,9>>,
-    _insertion_sort_t<index_sequence<9,8,6,7,5,4,2,3,1>,_greater>>);
+                _insertion_sort_t<index_sequence<9,8,6,7,5,4,2,3,1>,_greater>>);
+  
   #endif
 }
 
-#endif
-
-
-
+#undef NON_STL_CXX_14
+#undef NON_STL_CXX_17
+#undef NON_STL_CXX_20
+#undef NON_STL_17
+#undef NON_STL_14
+#undef NON_STL_20
+#undef NON_STL_HAS_CXX
+#undef INLINE
+#endif //_META_HPP_
