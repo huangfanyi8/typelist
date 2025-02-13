@@ -25,8 +25,14 @@
 #define NON_STL_CXX_17 201703L
 #define NON_STL_CXX_20 202002L
 
+#if defined(_MSVC_LANG)
+#define STL_LANG _MSVC_LANG
+#else
+#define STL_LANG __cplusplus
+#endif
+
 #define NON_STL_HAS_CXX(VERSION)\
-(defined(_MSVC_LANG) && _MSVC_LANG >= VERSION)|| (__cplusplus >= VERSION)
+(STL_LANG >= VERSION)
 
 #define NON_STL_14 NON_STL_HAS_CXX(NON_STL_CXX_14)
 #define NON_STL_17 NON_STL_HAS_CXX(NON_STL_CXX_17)

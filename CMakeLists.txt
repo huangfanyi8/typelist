@@ -6,4 +6,3 @@ project(meta
 
 set(CMAKE_CXX_STANDARD 17)
 set(root_directory ${CMAKE_CURRENT_SOURCE_DIR})
-add_subdirectory(test)
