@@ -1,7 +1,13 @@
 # type-list
+ >`TMP`(Template Meta Programming) for modern c++
 
-__type-list__ 是一个基于`c++14`及以上标准轻量级元编程库，它基于可变参数模板(`variadic   templates`）以及变量模板(`variable template`)提供包括排序，插入，查找，删除等多种算法.  
-支持任意可变参数模板与变量模板。
+[![Standard](https://img.shields.io/badge/c%2B%2B-14/17/20-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B#Standardization)
+![Static Badge](https://img.shields.io/badge/modern-TMP-green)
+
+***
+## 介绍
+ __type-list__ 是一个基于`c++14`及以上标准的现代轻量级元编程库，它提供包括排序，插入，查找，删除等多种算法用以操作任意可变参数模板与变量模板。  
+
 ***
 
 ## 构建
