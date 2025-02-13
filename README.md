@@ -1,16 +1,21 @@
-***Meta-type-list***
+# type-list
 
+__type-list__ 是一个基于`c++14`及以上标准轻量级元编程库，它基于可变参数模板(`variadic   templates`）以及变量模板(`variable template`)提供包括排序，插入，查找，删除等多种算法.  
+支持任意可变参数模板与变量模板。
 ***
-type-list 是一个基于c++14轻量级元编程库，它基于类型列表（type list）以及变量模板（variable template）提供包括排序，插入，查找，删除等多种算法。支持任意可变参数模板与变量模板。
-***
 
-##构建
+## 构建
 
-type-list是纯头文件模板库，仅仅需要包含`meta.hpp`单一头文件
-##示例
-[TOCM]
-##merge(合并)
+ - type-list是纯头文件模板库，使用`CMake`构建。使用时只需要下载并包含`meta.hpp`单一头文件
+
 ```
+#include"include/meta.hpp"
+```
+
+## 示例
+
+ - ### merge(合并)
+```c++
 /*合并TL的元素*/
 #include<utility>
 
@@ -23,11 +28,11 @@ template<class...>struct TL1{};
 static_assert(std::is_same_v<merge_t<TL<>,TL<>>,TL<>>);
 static_assert(std::is_same_v<merge_t<TL<int>,TL<void>>,TL<int,void>>);
 ```
-#unique(去重)
+ - ### unique(去重)
 
-```
+```c++
 /*去除TL中相等的元素*/
-#include<utility>
+#include"meta.hpp"
 
 using namespace common;
 
@@ -44,8 +49,8 @@ static_assert(is_unique_v<int_sequence<>>);
 static_assert(!is_unique_v<int_sequence<0,1,2,3,4,0>>);
 static_assert(!is_unique_v<std::index_sequence<1,2,3,4,0,0>>);
 ```
-#get_n(查找)
-```
+ - ### get_n(查找)
+```c++
 /*
 获取TL中第n个元素，支持负数下标(从-1开始).
 如果下标不合法，默认返回common::undefined或者common::error_constant
@@ -59,8 +64,8 @@ static_assert(is_same_v<get_n_t<std::tuple<int,double,int*,int&,char&,int*>,3>,i
 static_assert(is_same_v<get_n_t<std::tuple<int,double,int*,int&,char&,int*>,-3>,int&>);
 static_assert(is_same_v<get_n_t<std::tuple<int,double,int*,int&,char&,int*>,-2>,char&>); static_assert(is_same_v<get_n_t<std::tuple<int,double,int*,int&,char&,int*>,-100>,undefined>);
 ```
-#reverse(反转)
-```
+ - ### reverse(反转)
+```c++
 #include"meta.hpp"
 #include<variant>
 
@@ -69,8 +74,8 @@ static_assert(std::is_same_v<common::int_sequence<1,2,3,4,5>,
   
   static_assert(std::is_same_v<common::reverse_t<std::variant<int,char*>>,std::variant<char*,int>>);
 ```
-#insert(插入)
-```
+ - ### insert(插入)
+```c++
 //在第n个位置插入元素，支持负数下标
 
 #include"meta.hpp"
@@ -94,8 +99,8 @@ template<class...>class variant{};
 	insert_t<index_sequence<1,2,3,4>,5,index_sequence<5>>
 				>);
 ```
-#erase(删除)
-```
+ - ### erase(删除)
+```c++
   static_assert(::std::is_same_v<erase_t<index_sequence<1,2,3,4,5,6,7,8>,-6>,index_sequence<1,2,4,5,6,7,8>>);
   static_assert(::std::is_same_v<erase_t<index_sequence<1,2,3,4,5,6,7,8>,-7>,index_sequence<1,3,4,5,6,7,8>>);
   static_assert(::std::is_same_v<erase_t<index_sequence<1,2,3,4,5,6,7,8>,-8>,index_sequence<2,3,4,5,6,7,8>>);
