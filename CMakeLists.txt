@@ -5,4 +5,6 @@ project(meta
             HOMEPAGE_URL "https://github.com/huangfanyi8/typelist")
 
 set(CMAKE_CXX_STANDARD 17)
+add_library(tmp_14 INTERFACE include/meta.hpp)
+add_library(tmp_17 INTERFACE include/meta_17.hpp)
 set(root_directory ${CMAKE_CURRENT_SOURCE_DIR})
