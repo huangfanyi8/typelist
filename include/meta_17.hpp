@@ -15,63 +15,119 @@
 #define STL_17 HAS_CXX(201703L)
 #define STL_20 HAS_CXX(202002L)
 
+#define  SOME_NAMESPACE _DETAILS(nmae) namespace some##name
 #if STL_17
 
 namespace cxx17
 {
+    using signed_index_t = ptrdiff_t;
+    using unsigned_index_t = size_t;
+    using signed_size_type = ptrdiff_t;
+    using unsigned_size_type = size_t;
+    
+    template<signed_index_t _value>
+    using signed_index_constant = std::integral_constant<signed_index_t ,_value>;
+    
+    template<unsigned_index_t _value>
+    using unsigned_index_constant = std::integral_constant<unsigned_index_t ,_value>;
+}
+
+namespace cxx17
+{template<class...>struct  list{};}
+
+namespace cxx17
+{
+    //未定义类型，确保每种状态下都有值
     struct undefined_t
     {
         constexpr explicit undefined_t() = default;
     };
     
+    //未定义常量，确保每种状态下都有值
     inline constexpr undefined_t undefined{};
+    
+    struct error_constant{static constexpr undefined_t value = undefined;};
 }
 
 namespace cxx17
 {
-    using index_t = ptrdiff_t;
-    using signed_size_type = ptrdiff_t;
-    
-    template<class...O>
-    struct  list
-    {
-    private:
-        template<class...>struct _impl{};
-        
-        template<template<class...>class TL,class...T>
-        struct _impl<TL<T...>>
-        {using type = TL<O...>;};
-    public:
-        template<class Other>using type = typename _impl<Other>::type;
-    };
-    
     template<class T>
     struct identity
     {using type =T;};
-    
+}
+
+namespace cxx17
+{
     template<class>struct template_traits;
     
     template<class...T>
     struct template_traits<list<T...>>
     {
         using type = list<>;
-        static constexpr size_t extent = sizeof...(T);
+        static constexpr unsigned_size_type extent = sizeof...(T);
         using value_type = void;
     };
-    
+
     template<class T,T ... _value>
     struct template_traits<std::integer_sequence<T,_value...>>
     {
         using type = std::integer_sequence<T>;
-        static constexpr size_t extent = sizeof...(_value);
+        static constexpr unsigned_size_type extent = sizeof...(_value);
+        using value_type = T;
+    };
+
+    template<class T,T _value>
+    struct template_traits<std::integral_constant<T,_value>>
+    {
+        static constexpr unsigned_size_type extent = 1;
         using value_type = T;
     };
     
-    template<class T>using empty_t = typename template_traits<T>::type;
-    template<class T>using traits_value_t = typename template_traits<T>::value_type;
-    template<class T>inline constexpr size_t extent_v = template_traits<T>::extent;
+    template<class T>
+    using empty_t = typename template_traits<T>::type;
+    
+    template<class T>
+    using traits_value_t = typename template_traits<T>::value_type;
+    
+    template<class T>
+    inline constexpr unsigned_size_type extent_v = template_traits<T>::extent;
 }
 
+namespace cxx17
+{
+    template<class,class>struct to_custom;
+    template<class T,class = traits_value_t<T>>struct list_or_sequence;
+    
+    template<template<class...>class Custom,class...Other,class...List>
+    struct to_custom<Custom<Other...>,list<List...>>
+        :identity<Custom<List...>>
+    {};
+    
+    template<template<class DataType,DataType...>class Custom,class DataType,DataType..._other,DataType..._list>
+    struct to_custom<Custom<DataType,_other...>,std::integer_sequence<DataType,_list...>>
+        :identity<Custom<DataType,_list...>>
+    {};
+    
+    template<class DataType,DataType..._value>
+    struct list_or_sequence<std::integer_sequence<DataType,_value...>,void>
+        :identity<list<std::integral_constant<DataType,_value>...>>
+    {};
+    
+    template<class DataType,DataType..._value>
+    struct list_or_sequence<list<std::integral_constant<DataType,_value>...>,DataType>
+        :identity<std::integer_sequence<DataType,_value...>>
+    {};
+    
+    template<class Custom,class List>
+    using to_custom_t = typename to_custom<Custom,List>::type;
+    
+    template<class Template>using list_or_sequence_t = typename list_or_sequence<Template>::type;
+    /*
+    template<class...>class variant{};
+    static_assert(std::is_same_v<variant<int,double>,to_custom_t<variant<>,list<int,double>>>);
+    */
+ }
+ 
 namespace cxx17::_details
 {
     template<auto _index,class T>
@@ -81,46 +137,38 @@ namespace cxx17::_details
         using type = T;
     };
     
-    template<auto _index,class T>
-    struct _pair<_index,std::in_place_type_t<T>>
-    {
-        static constexpr auto  value = _index;
-        using type = T;
-    };
-    
-    template<class P>using _pair_t = typename P::type;
-    template<class P>inline constexpr auto  _pair_v = P::value;
-    
     template<class>struct _make_pair_list;
     
     template<class...List>
     struct _make_pair_list<list<List...>>
     {
+    private:
         template<class>
         struct _impl{};
         
         template<size_t..._index>
         struct _impl<std::index_sequence<_index...>>
-        {using type = list<_pair<index_t (_index),List>...>;};
+        {using type = list<_pair<signed_index_t (_index),List>...>;};
         
         using _id_sequence = std::index_sequence_for<List...>;
+    public:
         using type = typename _impl<_id_sequence>::type;
-        static constexpr bool value =true;
     };
     
     template<class T,T..._value>
     struct _make_pair_list<std::integer_sequence<T,_value...>>
     {
+    private:
         template<class>
         struct _impl{};
         
         template<size_t..._index>
         struct _impl<std::index_sequence<_index...>>
-        {using type = list<_pair<index_t (_index),std::integral_constant<T,_value>>...>;};
+        {using type = list<_pair<signed_index_t (_index),std::integral_constant<T,_value>>...>;};
         
         using _id_sequence = std::make_index_sequence<sizeof...(_value)>;
+    public:
         using type = typename _impl<_id_sequence>::type;
-        static constexpr bool value =false;
     };
     
     template<class T>using _make_pair_list_t = typename  _make_pair_list<T>::type;
@@ -128,7 +176,7 @@ namespace cxx17::_details
     template<class T,template<class...>class,class...>
     struct _transform
     {};
-    
+
     template<class T,T..._value,template<class...>class Tr,class...Other>
     struct _transform<std::integer_sequence<T,_value...>,Tr,Other...>
     {
@@ -137,6 +185,7 @@ namespace cxx17::_details
         
         template<class U>
         struct _impl
+            :identity<U>
         {};
         
         template<class U,U..._>
@@ -146,6 +195,36 @@ namespace cxx17::_details
     public:
         using type = typename _impl<typename Tr<_list,Other...>::type>::type;
     };
+    
+    template<class,class T,template<class...>class Traits,class...Parameters>
+    struct _is_contain_type
+        :std::false_type
+    {};
+    
+    template<class T,template<class...>class Traits,class...Parameters>
+    struct _is_contain_type<std::void_t<typename Traits<T,Parameters...>::type>,T,Traits,Parameters...>
+        :std::true_type
+    {};
+    
+    template<class T,template<class...>class Traits,class...Parameters>
+    inline constexpr bool _is_contain_type_v = _is_contain_type<void,T,Traits,Parameters...>::value;
+    
+    template<class T,template<class...>class Traits,class...Pameters>
+    struct _transform<T,Traits, std::false_type,Pameters...>
+    {using type = list<Traits<T,Pameters...>>;};
+    
+    template<class T,template<class...>class Traits,class...Parameters>
+    struct _transform<T,Traits, std::true_type,Parameters...>
+    {using type = list<typename Traits<T,Parameters...>::type>;};
+    
+    template<class T,template<class...>class Traits,class...Parameters>
+    using  _transform_t = typename _transform<T,Traits,std::bool_constant<_is_contain_type_v<T,Traits,Parameters...>>,Parameters...>::type;
+}
+
+namespace cxx17
+{
+    template<class>struct list_wrapper;
+    template<class>struct sequence_wrapper;
 }
 
 namespace cxx17
@@ -155,81 +234,88 @@ namespace cxx17
     
     namespace _details
     {
-        enum class _range{_less,_greater,_no};
+        template<signed_index_t _input_index,class TL>
+        inline constexpr signed_index_t  _final_index_v =
+            _input_index >= 0 ? _input_index : _input_index + signed_size_type(extent_v<TL>);
         
-        template<ptrdiff_t _input_index,class TL>
-        inline constexpr ptrdiff_t  _final_index_v = (_input_index>=0)?_input_index:_input_index+ptrdiff_t(extent_v<TL>);
+        template<class ,class = void>
+        inline constexpr bool _is_undefined_v = false;
         
-        template<ptrdiff_t _input_index,class TL>
-        inline constexpr _range _is_out_of_range = extent_v<TL><=_final_index_v<_input_index,TL>
-            ?_range::_greater
-            :0>_final_index_v<_input_index,TL>
-            ?_range::_less:_range::_no;
+        template<>
+        inline constexpr bool _is_undefined_v<undefined_t> = true;
+        
+        template<class T>
+        inline constexpr bool _is_undefined_v<T,std::void_t<decltype(T::value)>> = true;
     }
 }
 
 namespace cxx17
 {
-    template<class,class...>
-    struct merge
-    {using type = list<>;};
+    /*Merge Algorithm*/
+    template<class...Lists>
+    class merge
+    {};
     
-    template<class...A>
-    struct merge<void,list<A...>>
-    {using type=list<A...>;};
+    template<class Head,class...Rest>
+    class merge<Head,Rest...>
+    {
+    private:
+        template<class...>
+        struct _impl
+        {};
+        
+        template<template<class...>class Template,class...Types>
+        struct _impl<Template<Types...>>
+            :identity<Template<Types...>>
+        {};
+        
+        template<template<class Value,Value...>class Template,class Value,Value...value>
+        struct _impl<Template<Value,value...>>
+            :identity<Template<Value,value...>>
+        {};
+        
+        template<template<class...>class Template,class...P,class...O>
+        struct _impl<Template<P...>,Template<O...>>
+            :identity<Template<P...,O...>>
+        {};
+        
+        template<template<class Value,Value...>class Template,class Value,Value...P,Value...O>
+        struct _impl<Template<Value,P...>,Template<Value,O...>>
+            :identity<Template<Value,P...,O...>>
+        {};
+        
+        template<class T,class U,class...Other>
+        struct _impl<T,U,Other...>
+            :_impl<typename _impl<T,U>::type,Other...>
+        {};
+    public:
+        using type=typename _impl<Head,Rest...>::type;
+    };
     
-    template<class...T>using merge_t = typename merge<void,T...>::type;
-    
-    template<class...A,class...B>
-    struct merge<void,list<A...>,list<B...>>
-    {using type=list<A...,B...>;};
-    
-    template<class...A,class...B,class...C>
-    struct merge<void,list<A...>,list<B...>,list<C...>>
-    {using type=list<A...,B...,C...>;};
-    
-    template<class...A,class...B,class...C,class...D>
-    struct merge<void,list<A...>,list<B...>,list<C...>,list<D...>>
-    {using type=list<A...,B...,C...,D...>;};
-    
-    template<class...A,class...B,class...C,class...D,class...E>
-    struct merge<void,list<A...>,list<B...>,list<C...>,list<D...>,list<E...>>
-    {using type=list<A...,B...,C...,D...,E...>;};
-    
-    template<class...A,class...B,class...C,class...D,class...E,class...F>
-    struct merge<void,list<A...>,list<B...>,list<C...>,list<D...>,list<E...>,list<F...>>
-    {using type=list<A...,B...,C...,D...,E...,F...>;};
-    
-    template<class...A,class...B,class...C,class...D,class...E,class...F,class...G>
-    struct merge<void,list<A...>,list<B...>,list<C...>,list<D...>,list<E...>,list<F...>,list<G...>>
-    {using type=list<A...,B...,C...,D...,E...,F...,G...>;};
-    
-    template<class...A,class...B,class...C,class...D,class...E,class...F,class...G,class...H>
-    struct merge<void,list<A...>,list<B...>,list<C...>,list<D...>,list<E...>,list<F...>,list<G...>,list<H...>>
-    {using type=list<A...,B...,C...,D...,E...,F...,G...,H...>;};
-    
-    template<class...A,class...B,class...C,class...D,class...E,class...F,class...G,class...H,class...R>
-    struct merge<void,list<A...>,list<B...>,list<C...>,list<D...>,list<E...>,list<F...>,list<G...>,list<H...>,R...>
-    {using type=merge_t<list<A...>,list<B...>,list<C...>,list<D...>,list<E...>,list<F...>,list<G...>,list<H...>,merge_t<R...>>;};
+    template<class...Lists>
+    using merge_t=typename merge<Lists...>::type;
 }
 
 namespace cxx17
 {
-    template<class TL,index_t..._input_index>
+    template<class TL,signed_index_t..._input_index>
     struct in_range
     {
     public:
         enum  range{less,greater,in};
     private:
-        template<class,class = void>struct _impl:std::false_type {};
+        template<class,class = void>
+        struct _impl
+            :std::false_type
+        {};
         
         template<range..._value>
         struct _impl<std::integer_sequence<range,_value...>,std::enable_if_t<((_value==in)&&...)>>
             :std::true_type
         {};
+        static constexpr signed_index_t _size = signed_index_t (extent_v<TL>);
     public:
-        static constexpr index_t size = index_t (extent_v<TL>);
-        using type = std::integer_sequence<range,((extent_v<TL><=_details::_final_index_v<_input_index,TL>)
+        using type = std::integer_sequence<range,((_size<=_details::_final_index_v<_input_index,TL>)
                                                     ?greater
                                                     :0>_details::_final_index_v<_input_index,TL>
                                                     ?less
@@ -237,45 +323,59 @@ namespace cxx17
         
         static constexpr bool value = _impl<type>::value;
     };
+    
+    template<class TL,signed_index_t..._input_index>
+    inline constexpr bool  in_range_v = in_range<TL,_input_index...>::value;
+}
+
+namespace cxx17::_details
+{
+    template<class Template,class Index,class Undefined= undefined_t,class = void>
+    struct _get
+            :identity<Undefined>
+    {};
+    
+    template<class A,class...Rest,class Undefined>
+    struct _get<list<A,Rest...>,signed_index_constant<0>,Undefined>
+        :identity<A>
+    {};
+    
+    template<class A,class B,class...R,class Undefined>
+    struct _get<list<A,B,R...>,signed_index_constant<1>,Undefined>
+    {using type = B;};
+    
+    template<class A,class B,class C,class...R,class Undefined>
+    struct _get<list<A,B,C,R...>,signed_index_constant<2>,Undefined>
+    {using type = C;};
+    
+    template<class A,class B,class C,class D,class...R,class Undefined>
+    struct _get<list<A,B,C,D,R...>,signed_index_constant<3>,Undefined>
+    {using type = D;};
+    
+    template<signed_index_t  _index,class A,class B,class C,class D,class E,class...R,class Undefined>
+    struct _get<list<A,B,C,D,E,R...>,signed_index_constant<_index>,Undefined,std::enable_if_t<(_index>=4)>>
+        :_get<list<E,R...>,signed_index_constant<_index-4>,Undefined>
+    {};
+    
+    template<signed_index_t  _index,class DataType,DataType..._value,class Undefined>
+    struct _get<std::integer_sequence<DataType,_value...>,signed_index_constant<_index>,Undefined>
+        :_transform<std::integer_sequence<DataType,_value...>,_get,signed_index_constant<_index>,Undefined>
+    {};
+    
+    template<class Template,class Index,class Undefined = undefined_t>
+    using _get_t = typename _get<Template,Index,Undefined>::type;
 }
 
 namespace cxx17
 {
-    template<index_t ,class,class U = undefined_t,class =void >struct get{using type = U;};
+    template<signed_index_t _index,class List,class Undefined = undefined_t>
+    using get_t = _details::_get_t<List,signed_index_constant<_details::_final_index_v<_index,List>>,Undefined>;
     
-    template<class A,class...R>struct get<0,list<A,R...>>{using type = A;};
-    template<class A,class B,class...R>struct get<1,list<A,B,R...>>{using type = B;};
-    template<class A,class B,class C,class...R>struct get<2,list<A,B,C,R...>>{using type =C;};
-    template<class A,class B,class C,class D,class...R>struct get<3,list<A,B,C,D,R...>>{using type = D;};
-    template<class A,class B,class C,class D,class E,class...R>struct get<4,list<A,B,C,D,E,R...>>{using type = E;};
-    template<class A,class B,class C,class D,class E,class F,class...R>struct get<5,list<A,B,C,D,E,F,R...>>{using type = F;};
-    template<class A,class B,class C,class D,class E,class F,class G,class...R>struct get<6,list<A,B,C,D,E,F,G,R...>>{using type = G;};
-    template<class A,class B,class C,class D,class E,class F,class G,class H,class...R>struct get<7,list<A,B,C,D,E,F,G,H,R...>>{using type = H;};
+    template<class T>using front_t = get_t<0,T>;
+    template<class T>using back_t = get_t<-1,T>;
     
-    template<ptrdiff_t _index,class A,class B,class C,class D,class E,class F,class G,class H,class...R,class U>
-    struct get<_index,list<A,B,C,D,E,F,G,H,R...>,U,std::enable_if_t<(_index>=8)>>
-        :get<_index-8,list<R...>>
-    {};
-    
-    template<ptrdiff_t _index,class T,class U = undefined_t>
-    using get_t = typename get<_details::_final_index_v<_index,T>,T,U>::type;
-    
-    template<ptrdiff_t _index,class T,T..._value,class U>
-    struct get<_index,std::integer_sequence<T,_value...>,U>
-    {
-    private:
-        using _type = get_t<_index,list<std::integral_constant<T,_value>...>,U>;
-        
-        template<class>struct _impl{static constexpr auto value = _type::value;};
-        
-        template<>struct _impl<undefined_t>{static constexpr undefined_t value = undefined;};
-    public:
-        static constexpr auto value = _impl<_type>::value;
-    };
-    
-    template<index_t _index,class T,class U =undefined_t, class =void>
-    inline  constexpr auto get_v =get<_index,T,U>::value;
-    
+    template<signed_index_t _index,class Sequence,class Error = error_constant, class =void>
+    inline  constexpr auto get_v =get_t<_index,Sequence,Error>::value;
 }
 
 namespace cxx17
@@ -312,20 +412,55 @@ namespace cxx17
     
     template<class T>using unique_t = typename unique<T>::type;
     template<class T>using reverse_t = typename reverse<T>::type;
+    template<class T>inline constexpr bool is_unique_v = unique_t<T>::value;
+    
+    //static_assert(is_same_v<unique_t<std::index_sequence<>>,std::index_sequence<>>);
 }
 
 namespace cxx17
 {
-    template<class,ptrdiff_t,class...>struct _insert;
-    
     template<class,class...>struct append;
-    
+    template<class,class...>struct prepend;
+    template<class>struct pop_front;
+    template<class>struct pop_back;
+
     template<class...T,class...O>
     struct append<list<T...>,O...>
         :identity<list<T...,O...>>
     {};
-    
+
+    template<class...T,class...O>
+    struct prepend<list<T...>,O...>
+        :identity<list<O...,T...>>
+    {};
+
+    template<template<class DataType,DataType...>class Sequence,class DataType,DataType..._values,DataType..._add>
+    struct prepend<Sequence<DataType,_values...>,Sequence<DataType,_add...>>
+    {};
+
     template<class T,class... Add>using append_t =typename append<T,Add...>::type;
+    template<class T,class... Add>using prepend_t =typename prepend<T,Add...>::type;
+
+    namespace _details
+    {
+        enum _modifier_type{_inset_after,_insert_before,_replace,_erase};
+
+        template<_modifier_type _v>
+        using _modifier_constant = std::integral_constant<_modifier_type,_v>;
+
+        template<class Template,class Index,class,class Type,class Bool = std::bool_constant<in_range_v<Template,Index::value>>>struct _modifier;
+
+        template<class FirstItem,class...RestItems,signed_index_t _index,class...NewItems>
+        struct _modifier<list<FirstItem,RestItems...>,signed_index_constant<_index>,list<NewItems...>, _modifier_constant<_insert_before>,std::false_type>
+        {};
+
+        template<class Template,template<class...>class Traits,class...Parameters>
+        struct _insert_
+        {
+
+        };
+    }
+
 }
 
 namespace cxx17
@@ -443,27 +578,26 @@ namespace cxx17
     
     template<class List,class Node>
     using _make_huffman_code_t = typename _make_huffman_code<Node,List,std::integer_sequence<int>,Node::parent>::type;
-    
 }
 
 namespace cxx17
 {
     namespace _details
     {
-        template<class T,index_t _left,index_t _right,bool = in_range<T,_left,_right>::value>struct _swap;
+        template<class T,signed_index_t _left,signed_index_t _right,bool = in_range_v<T,_left,_right>>struct _swap;
         
-        template<class T,index_t _left,index_t _right>
+        template<class T,signed_index_t _left,signed_index_t _right>
         struct _swap<T,_left,_right, false>
             :identity<T>
         {};
         
-        template<class T,index_t _left,index_t _right>
+        template<class T,signed_index_t _left,signed_index_t _right>
         struct _swap<T,_left,_right, true>
         {
         private:
             using _list = _details::_make_pair_list_t<T>;
-            static constexpr index_t _left_index = _details::_final_index_v<_left,T>;
-            static constexpr index_t _right_index = _details::_final_index_v<_right,T>;
+            static constexpr signed_index_t _left_index = _details::_final_index_v<_left,T>;
+            static constexpr signed_index_t _right_index = _details::_final_index_v<_right,T>;
             using _pair_l = get_t<_left_index,_list>;
             using _pair_r = get_t<_right_index,_list>;
             
@@ -494,7 +628,7 @@ namespace cxx17
             using type = typename _impl1<_type>::type;
         };
         
-        template<class T,index_t _left,index_t  _right>using _swap_t = typename _swap<T,_left,_right>::type;
+        template<class T,signed_index_t _left,signed_index_t  _right>using _swap_t = typename _swap<T,_left,_right>::type;
     }
     template<class T,size_t _l,size_t _r>
     using swap_t = _details::_swap_t<T,_l,_r>;
@@ -504,69 +638,62 @@ namespace cxx17
 {
     namespace _details
     {
-        template<class T,index_t _current,index_t _end,bool = (_current*2+1<=_end),bool = (_current*2+2<=_end)>
-        struct _heap_sort_heapify_helper
-            :std::integral_constant<index_t ,_current>
+        template<class T,signed_index_t _current,signed_index_t _end,bool = (_current * 2 + 1 <= _end),bool = (_current * 2 + 2 <= _end)>
+        struct _three_max
+            :std::integral_constant<signed_index_t ,_current>
         {};
         
-        template<class T,index_t _current,index_t _end>
-        struct _heap_sort_heapify_helper<T,_current,_end,true,true>
+        template<class T,signed_index_t _current,signed_index_t _end>
+        struct _three_max<T,_current,_end,true,true>
         {
-        private:
-            static constexpr index_t left = 2*_current+1;
-            static constexpr index_t right = left+1;
-            static constexpr auto left_v = get_v<left,T>;
-            static constexpr auto right_v = get_v<right,T>;
-            static constexpr auto current_v = get_v<_current,T>;;
-            static constexpr auto value1 = current_v<left_v?left:_current;
-            static constexpr auto value2 = get_v<value1,T><right_v?right:value1;
-        public:
-            static constexpr auto value = value2;
+            using _sequence = T;
+            static constexpr auto _left_child = 2*_current+1;
+            static constexpr auto _left_child_value  =   get_v<_left_child,_sequence>;
+            static constexpr auto _right_child_value  =   get_v<_left_child+1,_sequence>;
+            static constexpr auto _root_value = get_v<_current,_sequence>;
+            static constexpr auto value= _left_child_value>_right_child_value?
+                                                 (_left_child_value>_root_value?_left_child:_current)
+                                                                                     :(_right_child_value>_root_value?_left_child+1:_current);
         };
         
-        template<class T,index_t _current,index_t _end>
-        struct _heap_sort_heapify_helper<T,_current,_end,true,false>
+        template<class T,signed_index_t _root,signed_index_t _end>
+        struct _three_max<T,_root,_end,true,false>
         {
-        private:
-            static constexpr index_t left = 2*_current+1;
-            static constexpr index_t right = left+1;
-            static constexpr auto left_v = get_v<left,T>;
-            static constexpr auto right_v = get_v<right,T>;
-            static constexpr auto current_v = get_v<_current,T>;
-            static constexpr auto value1 = current_v<left_v?left:_current;
-        public:
-            static constexpr auto value = value1;
+            using _sequence =T;
+            static constexpr auto _left_child_value  =   get_v<2*_root+1,_sequence>;
+            static constexpr auto _root_value = get_v<_root,_sequence>;
+            static constexpr auto value =  _left_child_value>_root_value?2*_root+1:_root;
         };
         
-        template<class T,index_t _current,index_t _end>
-        inline constexpr index_t  _heap_sort_heapify_helper_v = _heap_sort_heapify_helper<T,_current,_end>::value;
+        template<class T,signed_index_t _current,signed_index_t _end>
+        inline constexpr signed_index_t  _three_max_v = _three_max<T,_current,_end>::value;
         
-        template<class T,index_t _current,index_t _end,index_t _max = _details::_heap_sort_heapify_helper_v<T,_current,_end>>
-        struct _heap_sort_heapify
+        template<class T,signed_index_t _current,signed_index_t _end,signed_index_t _max = _details::_three_max_v<T,_current,_end>>
+        struct _heap_adjust
             :std::conditional_t<_max!=_current,
-            _heap_sort_heapify<_swap_t<T,_max,_current>,_max,_end>,
+            _heap_adjust<_swap_t<T,_max,_current>,_max,_end>,
             identity<T>>
         {};
         
-        template<class T,index_t _current,index_t _end>
-        using  _heap_sort_heapify_t = typename _heap_sort_heapify<T,_current,_end>::type;
+        template<class T,signed_index_t _current,signed_index_t _end>
+        using  _heap_adjust_t = typename _heap_adjust<T,_current,_end>::type;
         
-        template<class T,index_t _index>
+        template<class T,signed_index_t _index>
         struct _make_heap
             :std::conditional_t<(_index>=0),
-            _make_heap<_heap_sort_heapify_t<T,_index,index_t (extent_v<T>)-1>,_index-1>,identity<T>>
+            _make_heap<_heap_adjust_t<T,_index, signed_index_t (extent_v<T>) - 1>, _index - 1>,identity<T>>
         {};
         
-        template<class T>using _make_heap_t =typename _make_heap<T,index_t(extent_v<T>)/2-1>::type;
+        template<class T>using _make_heap_t =typename _make_heap<T, signed_index_t(extent_v<T>) / 2 - 1>::type;
         
         template<class T>
         struct _heap_sort
         {
             using _type = _make_heap_t<T>;
             
-            template<class U,index_t _index>
+            template<class U,signed_index_t _index>
             struct _impl
-                :_impl<_heap_sort_heapify_t <_swap_t<U,0,_index>,0,_index-1>,_index-1>
+                :_impl<_heap_adjust_t <_swap_t<U,0,_index>,0,_index-1>,_index-1>
             {};
             
             template<class U>
@@ -574,7 +701,7 @@ namespace cxx17
                 :identity<U>
             {};
             
-            using type =typename _impl<_type,index_t (extent_v<T>)-1>::type;
+            using type =typename _impl<_type, signed_index_t (extent_v<T>) - 1>::type;
         };
         
         template<class T>
@@ -604,22 +731,22 @@ namespace cxx17
         static constexpr signed_size_type _extent = signed_size_type (extent_v<T>);
         static constexpr signed_size_type _end = (_extent - 2) / 2;
         
-        template<index_t  _begin,bool = _begin*2+1<_extent,bool = _begin*2+2<_extent>
+        template<signed_index_t  _begin,bool = _begin * 2 + 1 < _extent,bool = _begin * 2 + 2 < _extent>
         struct _impl
             :std::true_type
         {};
         
-        template<index_t _begin>
+        template<signed_index_t _begin>
         struct _impl<_begin,true,false>
             :std::bool_constant<((get_v<_begin,T>)>=get_v<_begin*2+1,T>)>
         {};
         
-        template<index_t _begin>
+        template<signed_index_t _begin>
         struct _impl<_begin,true,true>
             :std::bool_constant<((get_v<_begin,T>)>=get_v<_begin*2+1,T>)&&((get_v<_begin,T>)>=get_v<_begin*2+2,T>)>
         {};
         
-        template<index_t _begin>
+        template<signed_index_t _begin>
         struct _pimpl
             :std::conditional_t<_begin<=_end,std::conditional_t<_impl<_begin>::value,_pimpl<_begin+1>,std::false_type>,std::true_type >
         {};
@@ -630,9 +757,231 @@ namespace cxx17
     static_assert(is_max_heap<make_heap_t<std::index_sequence<1,4,3,6,8,9,4,7,22>>>::value);
 }
 
+namespace meta::cxx17
+{
+    //未定义类型，确保每种状态下都有值
+    struct undefined_t
+    {constexpr explicit undefined_t() = default;};
+    
+    //未定义常量，确保每种状态下都有值
+    inline constexpr undefined_t undefined{};
+    
+    //TypeList
+    template<class...>
+    struct meta_list{};
+    
+    //cxx20 std::type_identity
+    template<class T>
+    struct type_identity
+    {using type = T;};
+    
+    //Meta Constant
+    enum class meta_state{
+        error
+    };
+    
+    template<class>struct template_traits;
+    
+    template<template<class...>class TypeList,class...T>
+    struct template_traits<TypeList<T...>>
+    {
+        using type = TypeList<>;
+        static constexpr size_t extent = sizeof...(T);
+        using value_type = void;
+    };
+    
+    template<template<class DataType,DataType...>class Sequence,class DataType,DataType ... _value>
+    struct template_traits<Sequence<DataType,_value...>>
+    {
+        using type = Sequence<DataType>;
+        static constexpr size_t extent = sizeof...(_value);
+        using value_type = DataType;
+    };
+    
+    //获取空模板类型
+    template<class T>
+    using empty_t = typename template_traits<T>::type;
+    
+    //萃取元序列的元素类型
+    template<class T>
+    using traits_value_t = typename template_traits<T>::value_type;
+    
+    //获取模板长度
+    template<class T>
+    inline constexpr size_t extent_v = template_traits<T>::extent;
+    //获取模板长度
+    template<class T>
+    inline constexpr ptrdiff_t signed_extent_v = static_cast<ptrdiff_t>(template_traits<T>::extent);
+
+    template<ptrdiff_t _input_index,class Template>
+    inline constexpr ptrdiff_t  _final_index_v =
+        _input_index >= 0 ? _input_index : _input_index + signed_extent_v<Template>;
+    
+    using error_constant = std::integral_constant<meta_state,meta_state::error>;
+    
+    template<class T,class,class = void>
+    struct get
+        :std::conditional_t<std::is_same_v<traits_value_t<T>,void>,error_constant,undefined_t>
+    {};
+    
+    template<template<class...>class TypeList,class F,class...Rest>
+    struct get<TypeList<F,Rest...>,std::integral_constant<ptrdiff_t,0>>
+    {using type = F;};
+    
+    template<template<class...>class TypeList,class F,class B,class...Rest>
+    struct get<TypeList<F,B,Rest...>,std::integral_constant<ptrdiff_t,1>>
+    {using type = B;};
+    
+    template<template<class...>class TypeList,class F,class B,class C,class...Rest>
+    struct get<TypeList<F,B,C,Rest...>,std::integral_constant<ptrdiff_t,2>>
+    {using type = C;};
+    
+    template<template<class...>class TypeList,class F,class B,class C,class D,class...Rest>
+    struct get<TypeList<F,B,C,D,Rest...>,std::integral_constant<ptrdiff_t,3>>
+    {using type = D;};
+    
+    template<template<class...>class TypeList,ptrdiff_t _index,class F,class B,class C,class D,class...Rest>
+    struct get<TypeList<F,B,C,D,Rest...>,std::integral_constant<ptrdiff_t,_index>,std::enable_if_t<(_index>3)>>
+        :get<TypeList<Rest...>,std::integral_constant<ptrdiff_t,_index-3>>
+    {};
+    
+    template<class,template<class...>class,class...>struct meta_transform;
+    
+    template<template<class DataType,DataType...>class Sequence,class  DataType,DataType..._value,
+    template<class...>class Traits,class...Other>
+    struct meta_transform<Sequence<DataType,_value...>,Traits,Other...>
+    {
+    private:
+        using _list = meta_list<std::integral_constant<DataType,_value>...>;
+        using _type = typename Traits<_list,Other...>::type;
+        
+        template<class T>
+        struct _pimpl
+            :type_identity<T>
+        {};
+        
+        template<class...Items>
+        struct _pimpl<meta_list<Items...>>
+            :type_identity<Sequence<DataType,Items::value...>>
+        {};
+    public:
+        using type = typename _pimpl<_type>::type;
+    };
+    
+    template<class Template,template<class...>class Traits,class...P>
+    using meta_transform_t = typename meta_transform<Template,Traits,P...>::type;
+    
+    template<class TypeList,ptrdiff_t _index>
+    using get_t = typename get<TypeList,std::integral_constant<ptrdiff_t,_final_index_v<_index,TypeList>>>::type;
+    
+    template<class...>
+    struct merge
+        :type_identity<undefined_t>
+    {};
+    
+    template<template<class...>class TypeList,class...Types>
+    struct merge<TypeList<Types...>>
+        :type_identity<TypeList<Types...>>
+    {};
+    
+    template<template<class...>class TypeList,class...A,class...B>
+    struct merge<TypeList<A...>,TypeList<B...>>
+        :type_identity<TypeList<A...,B...>>
+    {};
+    
+    template<template<class...>class TypeList,class...A,class...B,class...C>
+    struct merge<TypeList<A...>,TypeList<B...>,TypeList<C...>>
+        :type_identity<TypeList<A...,B...,C...>>
+    {};
+    
+    template<template<class...>class TypeList,class...A,class...B,class...C,class ... D>
+    struct merge<TypeList<A...>,TypeList<B...>,TypeList<C...>,TypeList<D...>>
+        :type_identity<TypeList<A...,B...,C...,D...>>
+    {};
+    
+    template<template<class DataType,DataType...>class Sequence,class DataType,DataType..._value>
+    struct merge<Sequence<DataType,_value...>>
+        :type_identity<Sequence<DataType,_value...>>
+    {};
+    
+    template<template<class DataType,DataType...>class Sequence,class DataType,
+        DataType..._value,DataType..._b>
+    struct merge<Sequence<DataType,_value...>,Sequence<DataType,_b...>>
+        :type_identity<Sequence<DataType,_value...,_b...>>
+    {};
+    
+    template<template<class DataType,DataType...>class Sequence,class DataType,
+        DataType..._value,DataType..._b,DataType..._c>
+    struct merge<Sequence<DataType,_value...>,Sequence<DataType,_b...>,Sequence<DataType,_c...>>
+        :type_identity<Sequence<DataType,_value...,_b...,_c...>>
+    {};
+    
+    template<template<class DataType,DataType...>class Sequence,class DataType,
+        DataType..._value,DataType..._b,DataType..._c,DataType..._d>
+    struct merge<Sequence<DataType,_value...>,Sequence<DataType,_b...>,Sequence<DataType,_c...>,Sequence<DataType,_d...>>
+        :type_identity<Sequence<DataType,_value...,_b...,_c...,_d...>>
+    {};
+    
+    template<class A,class B,class C,class D,class E,class...R>
+    struct merge<A,B,C,D,E,R...>
+        :merge<typename merge<A,B,C,D>::type,typename merge<E,R...>::type>
+    {};
+    
+    template<class...Templates>
+    using merge_t =typename merge<Templates...>::type;
+    
+    template<class TypeList,class Empty= empty_t<TypeList>>
+    struct reverse
+        :type_identity<Empty>
+    {};
+    
+    template<template<class...>class TypeList,class First,class...Rest,class...Reverse>
+    struct reverse<TypeList<First,Rest...>,TypeList<Reverse...>>
+        :reverse<TypeList<Rest...>,TypeList<First,Reverse...>>
+    {};
+    
+    template<template<class DataType,DataType...>class Sequence,class DataType,
+        DataType _first,DataType..._rest,DataType..._reverse>
+    struct reverse<Sequence<DataType,_first,_rest...>,Sequence<DataType,_reverse...>>
+        :meta_transform<Sequence<DataType,_first,_rest...>,reverse>
+    {};
+    
+    template<class T,class  U,class B>
+    struct unique
+    {
+        using type = U;
+        static constexpr bool value = B::value;
+    };
+    
+    template<template<class...>class TypeList,class F,class...T,class...U,class B>
+    struct unique<TypeList<F,T...>,TypeList<U...>,B>
+        :std::conditional_t<(std::is_same_v<F,U>||...),unique<TypeList<T...>,TypeList<U...>,std::false_type >,
+        unique<TypeList<T...>,TypeList<U...,F>,std::true_type >>
+    {};
+    
+    template<template<class DataType,DataType...>class Sequence,class DataType,
+        DataType _first,DataType..._rest>
+    struct unique<Sequence<DataType,_first,_rest...>,meta_list<>,std::true_type >
+        :meta_transform<Sequence<DataType,_first,_rest...>,unique,meta_list<>,std::true_type>
+    {};
+    
+    template<class T>using unique_t = typename unique<T,empty_t<T>,std::true_type >::type;
+    template<class T>using reverse_t = typename reverse<T>::type;
+    template<class T>inline constexpr bool is_unique_v = unique<T,empty_t<T>,std::true_type>::value;
+
+
+    static_assert(std::is_same_v<unique_t<meta_list<>>,meta_list<>>);
+    static_assert(std::is_same_v<unique_t<meta_list<int,int>>,meta_list<int>>);
+    static_assert(is_unique_v<std::index_sequence<>>);
+    static_assert(is_unique_v<meta_list<>>);
+}
+
+
+
 #endif//cxx17
 #undef MAKE
 #undef STL_LANG
 #undef STL_17
 #undef STL_20
 #endif //META_META_17_HPP
+

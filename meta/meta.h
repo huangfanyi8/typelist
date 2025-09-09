@@ -1,7 +1,7 @@
-/*
+/**
  meta库是一款基于c++17轻量级的元编程库，
- 在编译期对于元序列（TypeList 以及Variable Template）的各种算法性操作，包含分割，合并，切片，反转，排序，增删改查等等
- 与旧版本相比，使用std::make_integer_sequence 与std::tle_element代替原来的index参数递归，减少编译时间与内存消耗
+ 在编译期对于元序列（传统的TypeList以及c++14开始引入的Variable Template）的各种算法性操作，包含分割，合并，切片，反转，排序，增删改查等等
+ 与旧版本相比，使用std::make_integer_sequence 与std::tuple_element代替原来的index参数递归，减少编译时间与内存消耗
 类似于python的list，支持负数下标索引
 
  还未增加SFINAE检查判断输入的元序列是否合理
@@ -465,7 +465,6 @@ namespace meta
     template<class T,class...Add>
     using prepend_t = typename prepend<T,Add...>::type;
 
-
     template<class T,template<class/*Index Parameter*/,class,/*Element Parameters*/class...>class Pred,class...OtherParameters>
     struct _meta_filter
     {
@@ -605,10 +604,8 @@ namespace meta
     static_assert(is_same_v<insert_t<variant<int,char>,-2,char*>,variant<char*,int,char>>);
 }
 
-namespace meta::constant
+namespace meta::advance
 {
-    using std::index_sequence;
-
     template<class Sequence,meta_index_t index,traits_value_t<Sequence>...add>
     struct insert
     {
@@ -618,17 +615,6 @@ namespace meta::constant
 
     template<class T,meta_index_t  index,traits_value_t<T>...add>
     using insert_t = typename insert<T,index,add...>::type;
-
-    static_assert(is_same_v<insert_t<index_sequence<1,2,3,4,5>,0>,index_sequence<1,2,3,4,5>>);
-
-    static_assert(is_same_v<
-    index_sequence<1,2,3,4,5>,
-    insert_t<index_sequence<1,3,4,5>,1,2>,
-    insert_t<index_sequence<1,2,4,5>,2,3>,
-    insert_t<index_sequence<1,2,3,5>,3,4>
-    >);
-
-    static_assert(is_same_v<insert_t<index_sequence<1>,-1,2>,index_sequence<2,1>>);
 
     template<class Sequence,traits_value_t<Sequence> value>
     struct erase
@@ -669,6 +655,16 @@ namespace meta::constant
     static_assert(std::is_same_v<erase_t<std::index_sequence<4,1,2,3,4,5,4>,4>,std::index_sequence<1,2,3,5>>);
     static_assert(std::is_same_v<prepend_t<std::index_sequence<4,1,2,3,4,5,4>,4>,std::index_sequence<4,4,1,2,3,4,5,4>>);
     static_assert(std::is_same_v<append_t<std::index_sequence<4,1,2,3,4,5,4>,4>,std::index_sequence<4,1,2,3,4,5,4,4>>);
+    static_assert(is_same_v<insert_t<std::index_sequence<1,2,3,4,5>,0>,std::index_sequence<1,2,3,4,5>>);
+
+    static_assert(is_same_v<
+            std::index_sequence<1,2,3,4,5>,
+            insert_t<std::index_sequence<1,3,4,5>,1,2>,
+            insert_t<std::index_sequence<1,2,4,5>,2,3>,
+            insert_t<std::index_sequence<1,2,3,5>,3,4>
+    >);
+
+    static_assert(is_same_v<insert_t<std::index_sequence<1>,-1,2>,std::index_sequence<2,1>>);
 }
 
 namespace meta
@@ -849,12 +845,12 @@ namespace meta
     using build_heap_t = typename heap<T,Pred>::type;
 
     template<class T,template<class,class>class Pred = greater>
-    using new_sort_t = typename heap<T,Pred>::sort;
+    using heap_sort_t = typename heap<T,Pred>::sort;
 
     static_assert(std::is_same_v<build_heap_t<std::index_sequence<24,44, 18 ,52 ,92 ,74 ,44 ,15 ,57 ,17>>,
             std::index_sequence<92, 57 ,74, 52 ,44 ,18, 44, 15 ,24 ,17>>);
 
-    static_assert(std::is_same_v<new_sort_t<std::index_sequence<24,44, 18 ,52 ,92 ,74 ,44 ,15 ,57 ,17>>,
+    static_assert(std::is_same_v<heap_sort_t<std::index_sequence<24,44, 18 ,52 ,92 ,74 ,44 ,15 ,57 ,17>>,
             std::index_sequence<15, 17, 18 ,24 ,44, 44 ,52 ,57 ,74, 92>>);
 
     static_assert(is_same_v<insertion_sort_t<std::index_sequence<24,44, 18 ,52 ,92 ,74 ,44 ,15 ,57 ,17>>,
@@ -1006,7 +1002,7 @@ namespace meta
         template<class Current,class Code =  std::integer_sequence<int>>
         struct _single_code
                 :std::conditional_t<Current::parent!=-1,
-                _single_code<get_t<Current::parent,_tree>,constant::prepend_t<Code,Current::rotation>>,
+                _single_code<get_t<Current::parent,_tree>,advance::prepend_t<Code,Current::rotation>>,
                 type_identity<Code>>
         {};
 
@@ -1051,9 +1047,6 @@ namespace meta
         struct _min_sort<TL<A,B>,Binary>
             :std::conditional_t<Binary<A,B>::value,type_identity<TL<A,B>>,type_identity<TL<B,A>>>
         {};
-
-    template<class T,template<class,class>class Binary =less>
-    using _min_sort_t = typename _min_sort<T,Binary>::type;
 
         template<class  S1,class S2,class O,template<class,class>class Binary =less>
         struct _merge_two_sequence
@@ -1138,7 +1131,7 @@ namespace meta
     inline constexpr bool is_net = true;//带权
 
     enum class graph_type{};
-    
+
     template<class T,size_t _in_degree/*入度*/,size_t _out_degree/*出度*/,bool = is_arc>
     struct _graph_node
     {
@@ -1152,15 +1145,142 @@ namespace meta
         static constexpr size_t degree  = _in_degree+_out_degree;
     };
 
-    template<class,class,class = void>
-    struct _graph_edge
+    template<bool _in,class T>
+    struct _update_graph_node
     {};
+
+    template<bool v,class T,size_t _in_degree/*入度*/,size_t _out_degree/*出度*/>
+    struct _update_graph_node<v,_graph_node<T,_in_degree,_out_degree,false>>
+    {
+        using type= _graph_node<T,_in_degree+1,_out_degree,false>;
+    };
+
+    template<bool _in,class T,size_t _in_degree/*入度*/,size_t _out_degree/*出度*/>
+    struct _update_graph_node<_in,_graph_node<T,_in_degree,_out_degree, true>>
+    {
+        using type= std::conditional_t<_in,_graph_node<T,_in_degree+1,_out_degree,false>,
+                _graph_node<T,_in_degree,_out_degree+1,false>>;
+    };
+
+
+    template<class G,class Begin,class To,bool/*arc*/,bool/*net*/>
+    struct add_graph_edge
+    {
+
+
+    };
 
     template<class>
     struct make_adjacency_matrix
     {};
+}
+
+namespace meta
+{
+    struct null_node{};
+
+    namespace _tree
+    {
+        template<auto _value,class L,class R,class P>
+        struct _binary_tree_node
+        {
+            using left_subtree =  L;
+            using right_subtree =  R;
+            using parent = P;
+            static constexpr auto value = _value;
+        };
+
+        template<auto _value,class P>
+        using  leaf_node = _binary_tree_node<_value,null_node,null_node,P>;
+
+        template<class Tree,auto _new_value>
+        struct _bst_insert
+        {
+            template<class Cur,class P>
+            struct _create_new_node
+                    :std::conditional_t<(Cur::value>_new_value),
+                    _create_new_node<typename Cur::left_subtree,Cur>,
+                    _create_new_node<typename  Cur::right_subtree,Cur>>
+            {};
+
+            template<class P>
+            struct _create_new_node<null_node,P>
+            {
+                using type = _binary_tree_node<_new_value,null_node,null_node,P>;
+
+                using parent = _binary_tree_node<P::value,
+                std::conditional_t<(P::value>type::value),type,typename P::left_subtree>,
+                std::conditional_t<(P::value<type::value),type,typename P::right_subtree>,
+                typename P::parent>;
+            };
+
+            template<class T,bool = bool(extent_v<Tree>)>
+            struct _find_root
+                    :get<0,Tree,null_node>
+            {};
+
+            using _root_t = typename _find_root<Tree>::type;
+            using _new_node_t = typename _create_new_node<_root_t,null_node>::type;
+            using _update_parent_t = typename _create_new_node<_root_t,null_node>::parent;
+
+            template<class L>
+            struct _impl
+                    :type_identity<L>
+            {};
+
+            template<class ... Elements>
+            struct _impl<meta_list<Elements...>>
+            {
+                using _type= meta_list<std::conditional_t<Elements::value == _update_parent_t::value,_update_parent_t,Elements>...>;
+                using type = append_t<Tree,_new_node_t>;
+            };
+
+            using type = typename _impl<Tree>::type;
+        };
+
+        template<class Tree,auto _new>
+        using _bst_insert_t  = typename _bst_insert<Tree,_new>::type;
+    }
+
+    template<class T>
+    struct make_bst
+    {
+        using _value_type= traits_value_t<T>;
+
+        static_assert(_is_meta_sequence_v<T>);
+
+        using _items = _to_meta_list_t<unique_t<T>>;
+
+        template<class >
+        struct _init
+        {};
+
+        template<_value_type ..._values>
+        struct _init<std::integer_sequence<_value_type ,_values...>>
+        {
+            using type = meta_list<_tree::_binary_tree_node<_values,null_node,null_node,null_node>...>;
+        };
+
+        using _init_t = typename _init<T>::type;
+
+        template<class Tree,class L>
+        struct _impl
+                :type_identity<Tree>
+        {};
+
+        template<class Tree,class H,class...Items>
+        struct _impl<Tree,meta_list<H,Items...>>
+                :_impl<_tree::_bst_insert_t<Tree,H::value>,meta_list<Items...>>
+        {};
+
+        using type = typename _impl<meta_list<>,_items>::type;
+    };
+
+    template<class T>
+    using make_bst_t = typename make_bst<T>::type;
 
 
+    static_assert(is_same_v<make_bst_t<std::index_sequence<5,6,7>>,int>);
 
 }
 

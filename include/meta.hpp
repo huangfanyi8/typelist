@@ -12,11 +12,11 @@
  * c++2x common_type
  * c++2x common_reference
  *
- * constant operate
+ * advance operate
  */
 
-#ifndef _META_HPP_
-#define _META_HPP_
+#ifndef META_HPP
+#define META_HPP
 
 #include<utility>
 #include<cstddef>
@@ -44,7 +44,7 @@
 #define INLINE
 #endif
 
-/*constant*/
+/*advance*/
 namespace common
 {
   class undefined{};
@@ -362,7 +362,7 @@ namespace common
   }
 }
 
-/*inline constant*/
+/*inline advance*/
 namespace common
 {
   template<class List>
@@ -673,6 +673,7 @@ namespace common
 //take
 namespace common
 {
+
   template<template<class...>class TL,class H,class...R,
     template<class,class>class Traits,class Num,class Init,class O>
   struct _filter<Category::S_take,TL<H,R...>,Traits,Num,Init,O>
