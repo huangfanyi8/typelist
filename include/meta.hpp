@@ -1,18 +1,7 @@
 
 /*
- * Type_traits
- * c++2x std::type_identity
- * map
- * extended conditional
- * c++2x std::remove_cvref
- * copy
- * extended std::is_same
- * is_specialization
- * c++17 logic_pred
- * c++2x common_type
- * c++2x common_reference
- *
- * advance operate
+c++14实现轻量级元编程库，
+使用std::integral_constant作为模板参数代替c++17的auto关键字实现泛型模板参数
  */
 
 #ifndef META_HPP
